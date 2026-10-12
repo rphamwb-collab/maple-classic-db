@@ -1,0 +1,1208 @@
+/*
+  site.css: the "Maple World UI" look (see docs/design-plan.md).
+
+  How this file is organised:
+    1. Colour tokens (light + dark) and mapping them onto Pico's variables
+    2. Base type and page background
+    3. Header, nav, search
+    4. Building blocks: window (.win), slot (.slot), tabs, chips, pills, price
+    5. Pages: home, item browser, item tooltip, monster/NPC hero, lists
+    6. Market + chart empty state
+    7. Footer, phones, reduced motion
+
+  Pico.css still does forms, buttons and resets. We only re-colour it
+  and add the game-window pieces on top.
+*/
+
+/* =====================================================================
+   1. Colour tokens
+   Pico's own light/dark selectors are copied exactly so ours win
+   (same specificity, loaded later).
+   ===================================================================== */
+:root:not([data-theme="dark"]),
+[data-theme="light"] {
+  /* Light mode: sky over Maple Island */
+  --mw-sky: #D7ECF8;          /* page background */
+  --mw-sky-top: #B9DDF3;      /* top of the header fade */
+  --mw-paper: #FFFDF6;        /* window body */
+  --mw-paper-2: #F6EEDC;      /* inner rows, slots */
+  --mw-wood: #8A5A2B;         /* window borders, headings */
+  --mw-title: #8A5A2B;        /* window title strip */
+  --mw-wood-soft: #D9C2A0;    /* thin dividers */
+  --mw-orange: #E8771B;       /* clickable / selected only */
+  --mw-orange-ink: #B4540A;   /* orange text on light paper (AA contrast) */
+  --mw-green: #4E9A2E;        /* success / observed */
+  --mw-green-ink: #357A1B;
+  --mw-navy: #1D2846;         /* item tooltip */
+  --mw-gold: #FFCF3F;         /* item name in tooltip */
+  --mw-ink: #2E2418;          /* body text */
+  --mw-muted: #7D6A55;        /* secondary text */
+  --mw-chart: #1D2846;        /* price chart line */
+  --mw-grass: #7CC04B;        /* ground strip under sprites */
+  --mw-shadow: 0 3px 0 rgba(138, 90, 43, 0.25);   /* chunky "stacked" shadow */
+
+  --pico-background-color: var(--mw-sky);
+  --pico-color: var(--mw-ink);
+  --pico-muted-color: var(--mw-muted);
+  --pico-muted-border-color: var(--mw-wood-soft);
+  --pico-h1-color: var(--mw-wood);
+  --pico-h2-color: var(--mw-wood);
+  --pico-h3-color: var(--mw-wood);
+  --pico-primary: var(--mw-orange-ink);
+  --pico-primary-hover: #8F4206;
+  --pico-primary-background: var(--mw-orange);
+  --pico-primary-hover-background: #CC6210;
+  --pico-primary-border: var(--mw-orange);
+  --pico-primary-hover-border: #CC6210;
+  --pico-primary-inverse: #FFFFFF;
+  --pico-primary-focus: rgba(232, 119, 27, 0.45);
+  --pico-primary-underline: rgba(180, 84, 10, 0.4);
+  --pico-card-background-color: var(--mw-paper);
+  --pico-form-element-background-color: #FFFFFF;
+  --pico-form-element-border-color: var(--mw-wood-soft);
+  --pico-form-element-focus-color: var(--mw-orange);
+  --pico-table-border-color: var(--mw-wood-soft);
+  --pico-ins-color: var(--mw-green-ink);
+  --pico-del-color: #B3261E;
+}
+
+/* Dark mode: Ellinia at night. Applies when the OS is dark (unless forced light)… */
+@media only screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --mw-sky: #121B2E;
+    --mw-sky-top: #1B2947;
+    --mw-paper: #1C2840;
+    --mw-paper-2: #24324F;
+    --mw-wood: #6F86B3;
+    --mw-title: #2C3D63;
+    --mw-wood-soft: #33456A;
+    --mw-orange: #FF9A3C;
+    --mw-orange-ink: #FFAE5E;
+    --mw-green: #7CC45A;
+    --mw-green-ink: #8FD46C;
+    --mw-navy: #0C1326;
+    --mw-gold: #FFD34F;
+    --mw-ink: #E9EEF8;
+    --mw-muted: #9FAAC2;
+    --mw-chart: #8FB4FF;
+    --mw-grass: #3F7A33;
+    --mw-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+
+    --pico-background-color: var(--mw-sky);
+    --pico-color: var(--mw-ink);
+    --pico-muted-color: var(--mw-muted);
+    --pico-muted-border-color: var(--mw-wood-soft);
+    --pico-h1-color: #CFE0FF;
+    --pico-h2-color: #CFE0FF;
+    --pico-h3-color: #CFE0FF;
+    --pico-primary: var(--mw-orange-ink);
+    --pico-primary-hover: #FFC58C;
+    --pico-primary-background: var(--mw-orange);
+    --pico-primary-hover-background: #FFB161;
+    --pico-primary-border: var(--mw-orange);
+    --pico-primary-hover-border: #FFB161;
+    --pico-primary-inverse: #2A1500;
+    --pico-primary-focus: rgba(255, 154, 60, 0.5);
+    --pico-primary-underline: rgba(255, 174, 94, 0.45);
+    --pico-card-background-color: var(--mw-paper);
+    --pico-form-element-background-color: #16213A;
+    --pico-form-element-border-color: var(--mw-wood-soft);
+    --pico-form-element-focus-color: var(--mw-orange);
+    --pico-table-border-color: var(--mw-wood-soft);
+    --pico-ins-color: var(--mw-green-ink);
+    --pico-del-color: #FF8A80;
+  }
+}
+/* …or when a page forces dark with <html data-theme="dark">. Same values as above. */
+[data-theme="dark"] {
+  --mw-sky: #121B2E; --mw-sky-top: #1B2947; --mw-paper: #1C2840; --mw-paper-2: #24324F;
+  --mw-wood: #6F86B3; --mw-title: #2C3D63; --mw-wood-soft: #33456A; --mw-orange: #FF9A3C; --mw-orange-ink: #FFAE5E;
+  --mw-green: #7CC45A; --mw-green-ink: #8FD46C; --mw-navy: #0C1326; --mw-gold: #FFD34F;
+  --mw-ink: #E9EEF8; --mw-muted: #9FAAC2; --mw-chart: #8FB4FF; --mw-grass: #3F7A33;
+  --mw-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  --pico-background-color: var(--mw-sky); --pico-color: var(--mw-ink);
+  --pico-muted-color: var(--mw-muted); --pico-muted-border-color: var(--mw-wood-soft);
+  --pico-h1-color: #CFE0FF; --pico-h2-color: #CFE0FF; --pico-h3-color: #CFE0FF;
+  --pico-primary: var(--mw-orange-ink); --pico-primary-hover: #FFC58C;
+  --pico-primary-background: var(--mw-orange); --pico-primary-hover-background: #FFB161;
+  --pico-primary-border: var(--mw-orange); --pico-primary-hover-border: #FFB161;
+  --pico-primary-inverse: #2A1500; --pico-primary-focus: rgba(255, 154, 60, 0.5);
+  --pico-card-background-color: var(--mw-paper);
+  --pico-form-element-background-color: #16213A; --pico-form-element-border-color: var(--mw-wood-soft);
+  --pico-form-element-focus-color: var(--mw-orange); --pico-table-border-color: var(--mw-wood-soft);
+  --pico-ins-color: var(--mw-green-ink); --pico-del-color: #FF8A80;
+}
+
+/* =====================================================================
+   2. Base type and page
+   ===================================================================== */
+:root {
+  --pico-font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pico-line-height: 1.55;
+  --pico-border-radius: 10px;
+  --mw-display: "Fredoka", "Nunito", system-ui, sans-serif;
+  --mw-pixel: "DotGothic16", "Nunito", monospace;
+}
+body {
+  background: var(--mw-sky);
+  color: var(--mw-ink);
+}
+h1, h2, h3, h4 {
+  font-family: var(--mw-display);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+/* Type scale (1.25 ratio) */
+h1 { font-size: 2.44rem; line-height: 1.1; }
+h2 { font-size: 1.56rem; line-height: 1.2; }
+h3 { font-size: 1.25rem; line-height: 1.25; }
+.muted { color: var(--mw-muted); }
+.num, td.num, th.num { font-variant-numeric: tabular-nums; }
+
+/* Visible keyboard focus everywhere: a thick orange ring. */
+:where(a, button, input, select, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--mw-orange);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Pico gives links inside <nav> negative margins; our nav pieces don't want that. */
+nav .main-nav a, nav .tabs a, nav .chip, nav.pager a { margin: 0; }
+nav .main-nav li, nav .tabs li, nav .chips li { padding: 0; }
+nav ul.main-nav, nav ul.tabs, nav ul.chips { margin-left: 0; margin-right: 0; }
+
+/* Screen-reader-only text (for labels we don't want to show). */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+/* =====================================================================
+   3. Header, nav, search
+   ===================================================================== */
+.site-header {
+  /* The one gradient on the site: a soft sky fade behind the header. */
+  background: linear-gradient(var(--mw-sky-top), var(--mw-sky));
+  padding: 0.75rem 0 1rem;
+  margin-bottom: 1rem;
+}
+.site-header .bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--mw-display);
+  font-weight: 600;
+  font-size: 1.35rem;
+  color: var(--pico-h1-color);
+  text-decoration: none;
+}
+.brand svg { width: 30px; height: 30px; flex: none; }
+.main-nav {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.main-nav li { list-style: none; margin: 0; padding: 0; }
+.main-nav a {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  font-family: var(--mw-display);
+  font-weight: 500;
+  color: var(--mw-ink);
+  text-decoration: none;
+}
+.main-nav a:hover { background: var(--mw-paper); }
+.main-nav a[aria-current="page"] {
+  background: var(--mw-paper);
+  color: var(--mw-orange-ink);
+  box-shadow: inset 0 -3px 0 var(--mw-orange);
+}
+.site-header .search-box {
+  flex: 1 1 16rem;
+  max-width: 26rem;
+  margin-left: auto;
+}
+
+/* Search box + suggestion dropdown */
+.search-box {
+  position: relative;
+  margin-bottom: 0;
+}
+.search-box input[type="search"] {
+  margin-bottom: 0;
+  border: 2px solid var(--mw-wood-soft);
+  background-color: var(--mw-paper);
+}
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0.35rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--mw-paper);
+  border: 3px solid var(--mw-wood);
+  border-radius: 12px;
+  box-shadow: var(--mw-shadow);
+  max-height: 24rem;
+  overflow-y: auto;
+}
+.suggestions:empty { display: none; }
+.suggestions li { list-style: none; margin: 0; padding: 0; }
+.suggestions a {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  color: var(--mw-ink);
+  text-decoration: none;
+}
+.suggestions a:hover,
+.suggestions a:focus { background: var(--mw-paper-2); }
+.suggestions .empty { padding: 0.5rem 0.75rem; color: var(--mw-muted); }
+.suggestions .see-all { color: var(--mw-orange-ink); font-weight: 700; }
+.suggestions .icon { width: 28px; height: 28px; }
+
+/* Little "what kind of thing is this" tag */
+.kind-tag {
+  margin-left: auto;
+  font-size: 0.75em;
+  padding: 0.05em 0.55em;
+  border-radius: 999px;
+  background: var(--mw-paper-2);
+  color: var(--mw-muted);
+  white-space: nowrap;
+}
+
+/* =====================================================================
+   4. Building blocks
+   ===================================================================== */
+
+/* --- Icons and sprites (game art stays pixel-crisp) --- */
+.icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  vertical-align: middle;
+}
+.icon-sm { width: 22px; height: 22px; }
+.icon-lg { width: 64px; height: 64px; }
+
+/* --- Slot: a rounded inventory square that holds one icon --- */
+.slot {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 9px;
+  background: var(--mw-paper-2);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.08), inset 0 0 0 1px var(--mw-wood-soft);
+}
+.slot-lg { width: 72px; height: 72px; border-radius: 12px; }
+.slot-lg .icon { width: 56px; height: 56px; }
+/* Stack count in the bottom-right corner, like the game inventory */
+.slot .qty {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-family: var(--mw-pixel);
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--mw-ink);
+  text-shadow: 0 0 2px var(--mw-paper), 0 0 2px var(--mw-paper);
+}
+
+/* --- Window: the in-game panel used instead of plain cards --- */
+.win {
+  margin: 0 0 1.5rem;
+  background: var(--mw-paper);
+  border: 3px solid var(--mw-wood);
+  border-radius: 14px;
+  box-shadow: var(--mw-shadow);
+  overflow: hidden;           /* keeps the title strip inside the rounded corners */
+}
+.win-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.45rem 1rem;
+  background: var(--mw-title);
+  color: #FFF8EC;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.win-title .count {
+  margin-left: auto;
+  font-family: var(--pico-font-family);
+  font-size: 0.85rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.win-body { padding: 1rem; }
+.win-body > :last-child { margin-bottom: 0; }
+.win-note {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  border-top: 1px solid var(--mw-wood-soft);
+  font-size: 0.85rem;
+  color: var(--mw-muted);
+}
+
+/* --- Class tabs: inventory-style tabs sitting on top of a window --- */
+.tabs {
+  position: relative;
+  z-index: 1;                 /* sits over the window's top border */
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem;
+  margin: 0 0 -3px;           /* overlap the window border by its width */
+  padding: 0 0.5rem;
+  list-style: none;
+  overflow-x: auto;           /* phones: swipe sideways */
+  scrollbar-width: thin;
+}
+.tabs li { list-style: none; margin: 0; padding: 0; flex: none; }
+.tabs a {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  border: 3px solid var(--mw-wood);
+  border-radius: 12px 12px 0 0;
+  background: var(--mw-paper-2);
+  color: var(--mw-muted);
+  font-family: var(--mw-display);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tabs a:hover { color: var(--mw-ink); }
+/* The selected tab is taller and joins the window (its bottom border matches the paper). */
+.tabs a[aria-current="page"] {
+  padding-top: 0.6rem;
+  background: var(--mw-paper);
+  border-bottom-color: var(--mw-paper);
+  color: var(--mw-ink);
+  box-shadow: inset 0 3px 0 var(--mw-orange);
+}
+.tabs .count {
+  font-family: var(--pico-font-family);
+  font-size: 0.75rem;
+  color: var(--mw-muted);
+}
+.tabs + .win { border-top-left-radius: 0; }
+
+/* --- Filter chips: pill buttons with a tiny picture --- */
+.filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px dashed var(--mw-wood-soft);
+}
+.filter-row:last-of-type { border-bottom: 0; }
+.filter-row > .label {
+  flex: none;
+  width: 4.75rem;
+  padding-top: 0.35rem;
+  font-family: var(--mw-display);
+  font-weight: 500;
+  color: var(--mw-wood);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chips li { list-style: none; margin: 0; padding: 0; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.7rem 0.2rem 0.3rem;
+  border: 2px solid var(--mw-wood-soft);
+  border-radius: 999px;
+  background: var(--mw-paper);
+  color: var(--mw-ink);
+  font-size: 0.9rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chip:hover { border-color: var(--mw-orange); }
+.chip .icon { width: 22px; height: 22px; }
+.chip .count { font-size: 0.75rem; color: var(--mw-muted); }
+.chip[aria-current="true"] {
+  background: var(--mw-orange);
+  border-color: var(--mw-orange);
+  color: var(--pico-primary-inverse);
+  font-weight: 700;
+}
+.chip[aria-current="true"] .count { color: inherit; opacity: 0.85; }
+.chip.no-icon { padding-left: 0.7rem; }
+
+/* --- Rate pills on drops --- */
+.pill {
+  display: inline-block;
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pill-known { background: var(--mw-navy); color: #FFFFFF; }
+.pill-observed { background: var(--mw-green); color: #FFFFFF; }
+.pill-unknown {
+  border: 2px dashed var(--mw-wood-soft);
+  color: var(--mw-muted);
+  font-weight: 400;
+}
+.pill-warn { background: transparent; color: var(--pico-del-color); border: 1px solid currentColor; font-weight: 400; }
+.pill-tag { background: var(--mw-paper-2); color: var(--mw-ink); font-weight: 400; }
+/* Dark mode: navy pill would vanish on the dark window, so lighten it */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pill-known { background: #3A4F80; }
+}
+[data-theme="dark"] .pill-known { background: #3A4F80; }
+
+/* --- Meso price: pixel numbers with a little gold coin --- */
+.mesos {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--mw-pixel);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mesos::before {
+  content: "";
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #FFF1A8, #F2B600 60%, #B98500);
+  box-shadow: 0 0 0 1px #9C6F00;
+  flex: none;
+}
+
+/* --- Empty state: a dashed box that tells you what to do --- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.75rem 1rem;
+  border: 2px dashed var(--mw-wood-soft);
+  border-radius: 12px;
+  text-align: center;
+}
+.empty-state p { margin: 0; max-width: 36ch; }
+.empty-state .big { font-family: var(--mw-display); font-size: 1.15rem; color: var(--mw-ink); }
+.empty-state .coin-stack {
+  /* three CSS coins, no image needed */
+  display: flex;
+  gap: 2px;
+}
+.empty-state .coin-stack span {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #FFF1A8, #F2B600 60%, #B98500);
+  box-shadow: 0 0 0 1px #9C6F00;
+}
+.empty-state .coin-stack span:nth-child(2) { transform: translateY(-6px); }
+
+/* --- Buttons: chunky game buttons --- */
+button,
+[role="button"],
+input[type="submit"] {
+  font-family: var(--mw-display);
+  font-weight: 600;
+  border-radius: 999px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
+}
+.button-link {
+  display: inline-block;
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  background: var(--mw-orange);
+  color: var(--pico-primary-inverse);
+  font-family: var(--mw-display);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
+}
+.button-link:hover { background: var(--pico-primary-hover-background); color: var(--pico-primary-inverse); }
+
+/* --- Row list: icon + text + value on the right (replaces wide tables) --- */
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rows > li {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--mw-wood-soft);
+}
+.rows > li:last-child { border-bottom: 0; }
+.rows .main { flex: 1 1 auto; min-width: 0; }
+.rows .main a { font-weight: 700; }
+.rows .sub { display: block; font-size: 0.85rem; color: var(--mw-muted); }
+.rows .end { flex: none; text-align: right; }
+.rows .end .sub { margin-top: 0.15rem; }
+
+/* --- Card grid: used for item results, drops, monsters, NPCs --- */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-grid > li { list-style: none; margin: 0; padding: 0; }
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  height: 100%;
+  padding: 0.75rem 0.5rem 0.6rem;
+  border: 2px solid var(--mw-wood-soft);
+  border-radius: 12px;
+  background: var(--mw-paper);
+  color: var(--mw-ink);
+  text-align: center;
+  text-decoration: none;
+}
+a.card:hover { border-color: var(--mw-orange); }
+.card .name { font-weight: 700; line-height: 1.25; }
+.card .meta { font-size: 0.8rem; color: var(--mw-muted); }
+.card .sprite-box {
+  display: grid;
+  place-items: end center;
+  width: 100%;
+  height: 84px;
+}
+.card .sprite-box img {
+  max-width: 100%;
+  max-height: 84px;
+  width: auto;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+/* =====================================================================
+   5. Pages
+   ===================================================================== */
+
+/* --- Page heading block --- */
+.page-head { margin: 0.5rem 0 1.25rem; }
+.page-head h1 { margin-bottom: 0.25rem; }
+.page-head p { margin: 0; color: var(--mw-muted); }
+.breadcrumb {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--mw-muted);
+}
+.breadcrumb a { color: var(--mw-muted); }
+.breadcrumb a:hover { color: var(--mw-orange-ink); }
+
+/* --- Home --- */
+.home-hero {
+  padding: 1.5rem 0 1rem;
+  max-width: 40rem;
+}
+.home-hero h1 { font-size: 2.44rem; margin-bottom: 0.75rem; }
+.home-hero .search-box input[type="search"] {
+  font-size: 1.15rem;
+  height: auto;
+  padding: 0.9rem 1.2rem 0.9rem 3rem;   /* room on the left for Pico's magnifier icon */
+  background-position: center left 1.1rem;
+  border-width: 3px;
+  border-color: var(--mw-wood);
+  border-radius: 999px;
+}
+.home-hero .counts { margin: 0.75rem 0 0; color: var(--mw-muted); }
+.home-hero .counts strong { color: var(--mw-ink); }
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.class-grid li { list-style: none; margin: 0; padding: 0; }
+
+/* --- Class colours: one per class, used on home cards and the /items tabs.
+       --cls = strong colour (borders, name), --cls-sky = stage background. --- */
+[data-class="beginner"] { --cls: #C98A10; --cls-sky: #FFF1C2; }
+[data-class="warrior"]  { --cls: #C23B22; --cls-sky: #FFD9CC; }
+[data-class="magician"] { --cls: #3A5FCD; --cls-sky: #D6E0FF; }
+[data-class="bowman"]   { --cls: #3E8E2A; --cls-sky: #D6F0C8; }
+[data-class="thief"]    { --cls: #7A3FB0; --cls-sky: #E6D6F5; }
+@media only screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-class="beginner"] { --cls: #F0B93A; --cls-sky: #3A3016; }
+  :root:not([data-theme="light"]) [data-class="warrior"]  { --cls: #FF7A5C; --cls-sky: #3D1E1A; }
+  :root:not([data-theme="light"]) [data-class="magician"] { --cls: #8FA8FF; --cls-sky: #1D2A52; }
+  :root:not([data-theme="light"]) [data-class="bowman"]   { --cls: #85D06A; --cls-sky: #1C3518; }
+  :root:not([data-theme="light"]) [data-class="thief"]    { --cls: #C69AF0; --cls-sky: #2E1E42; }
+}
+[data-theme="dark"] [data-class="beginner"] { --cls: #F0B93A; --cls-sky: #3A3016; }
+[data-theme="dark"] [data-class="warrior"]  { --cls: #FF7A5C; --cls-sky: #3D1E1A; }
+[data-theme="dark"] [data-class="magician"] { --cls: #8FA8FF; --cls-sky: #1D2A52; }
+[data-theme="dark"] [data-class="bowman"]   { --cls: #85D06A; --cls-sky: #1C3518; }
+[data-theme="dark"] [data-class="thief"]    { --cls: #C69AF0; --cls-sky: #2E1E42; }
+
+/* --- Home: "Choose your class" showcase (the centrepiece) --- */
+.class-showcase { margin: 0.5rem 0 2rem; }
+.showcase-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.showcase-head h2 { font-size: 1.95rem; margin: 0; }
+.class-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+}
+.class-card {
+  list-style: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--mw-paper);
+  border: 3px solid var(--cls);
+  border-radius: 16px;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--cls) 45%, transparent);
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.class-card:hover, .class-card:focus-within {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 0 color-mix(in srgb, var(--cls) 45%, transparent);
+}
+.class-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.2rem;
+  padding: 0 0.75rem 0.6rem;
+  color: var(--mw-ink);
+  text-decoration: none;
+  flex: 1;
+}
+.class-main:hover { color: var(--mw-ink); }
+.class-stage {
+  /* the class hat, big, on a sunburst in the class colour */
+  display: grid;
+  place-items: center;
+  width: calc(100% + 1.5rem);
+  height: 9.5rem;
+  margin: 0 -0.75rem 0.4rem;
+  background:
+    radial-gradient(circle at 50% 50%, var(--cls-sky) 0 2.6rem, transparent 4.8rem),
+    repeating-conic-gradient(from 0deg at 50% 50%,
+      color-mix(in srgb, var(--cls) 22%, var(--cls-sky)) 0 10deg, var(--cls-sky) 10deg 20deg);
+  border-bottom: 3px solid var(--cls);
+}
+.class-stage img {
+  /* class character (static/img/classes/*.png), shown ~1.6x; pixelated keeps it crisp */
+  height: 8rem;
+  width: auto;
+  max-width: 92%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 0 color-mix(in srgb, var(--cls) 40%, transparent));
+  transition: transform 0.2s ease;
+}
+.class-card:hover .class-stage img { transform: translateY(-4px); }
+
+/* Title lettering in Nexon's free "Maplestory" font (the game's own branding
+   typeface), trimmed to Latin letters and hosted here. White outline + soft shadow. */
+@font-face {
+  font-family: "Maplestory";
+  src: url("/static/fonts/Maplestory-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Maplestory";
+  src: url("/static/fonts/Maplestory-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+.title-text, .class-name {
+  --outline: #FFFFFF;
+  --drop: rgba(46, 36, 24, 0.35);
+  font-family: "Maplestory", "Fredoka", system-ui, sans-serif;  /* named directly: a var() here didn't apply */
+  font-weight: 700;
+  letter-spacing: 0;
+  /* thin outline from 8 shadows around the letters + a soft drop shadow below */
+  text-shadow:
+    -2px -2px 0 var(--outline), 0 -2px 0 var(--outline), 2px -2px 0 var(--outline),
+    -2px 0 0 var(--outline), 2px 0 0 var(--outline),
+    -2px 2px 0 var(--outline), 0 2px 0 var(--outline), 2px 2px 0 var(--outline),
+    0 4px 3px var(--drop);
+}
+.title-text { color: var(--mw-wood); font-size: 2.1rem; line-height: 1.15; }
+.class-name {
+  font-size: 2rem;
+  line-height: 1.05;
+  color: var(--cls);
+  margin-top: 0.15rem;
+}
+@media only screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .title-text, :root:not([data-theme="light"]) .class-name {
+    --outline: #0C1326;
+    --drop: rgba(0, 0, 0, 0.6);
+  }
+  :root:not([data-theme="light"]) .title-text { color: #FFD34F; }
+}
+[data-theme="dark"] .title-text, [data-theme="dark"] .class-name {
+  --outline: #0C1326;
+  --drop: rgba(0, 0, 0, 0.6);
+}
+[data-theme="dark"] .title-text { color: #FFD34F; }
+
+/* --- Home: "Hunt monsters" field --- */
+.monster-field { margin: 0 0 2rem; }
+.field {
+  border: 3px solid var(--mw-wood);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--mw-shadow);
+  /* sky on top, then a thick grass + dirt ground the monsters stand on */
+  background:
+    linear-gradient(to bottom, transparent calc(100% - 3.6rem), var(--mw-grass) calc(100% - 3.6rem),
+      var(--mw-grass) calc(100% - 2.9rem), #A0703F calc(100% - 2.9rem)),
+    linear-gradient(var(--mw-sky-top), var(--mw-paper-2));
+}
+.field-row {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: space-around;
+  margin: 0;
+  padding: 1rem 0.75rem 0;
+  overflow-x: auto;                 /* phones: swipe along the field */
+  scrollbar-width: thin;
+}
+.field-row li { list-style: none; margin: 0; padding: 0; flex: 1 1 0; min-width: 5.75rem; }
+.field-row a {
+  display: grid;
+  grid-template-rows: 7rem auto auto;
+  justify-items: center;
+  padding: 0 0.25rem 0.55rem;
+  text-decoration: none;
+  color: #FFF8EC;
+}
+.field-sprite { display: grid; place-items: end center; height: 7rem; padding-bottom: 0.15rem; }
+.field-sprite img {
+  max-height: 6.5rem;
+  max-width: 7.5rem;
+  width: auto;
+  height: auto;
+  image-rendering: pixelated;
+  transition: transform 0.2s ease;
+}
+.field-row a:hover .field-sprite img { transform: translateY(-6px); }
+.field-name {
+  margin-top: 0.85rem;              /* sits on the dirt strip */
+  font-family: var(--mw-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  line-height: 1.15;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.field-level {
+  font-family: var(--mw-pixel);
+  font-size: 0.75rem;
+  color: #FFE7A8;
+}
+.field-row a:hover .field-name { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) {
+  .class-stage img, .field-sprite img { transition: none; }
+  .class-card:hover .class-stage img, .field-row a:hover .field-sprite img { transform: none; }
+}
+.class-facts { font-weight: 700; font-size: 0.9rem; }
+.class-blurb { font-size: 0.85rem; color: var(--mw-muted); line-height: 1.35; }
+.class-cta {
+  margin-top: auto;
+  padding-top: 0.4rem;
+  font-family: var(--mw-display);
+  font-weight: 600;
+  color: var(--cls);
+}
+.class-main:hover .class-cta { text-decoration: underline; }
+.class-gear {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.55rem 0.5rem 0.7rem;
+  border-top: 2px dashed var(--mw-wood-soft);
+}
+.class-gear li { list-style: none; margin: 0; padding: 0; }
+.class-gear a { display: block; border-radius: 10px; }
+.class-gear a:hover .slot { border-color: var(--cls); }
+
+/* /items class tabs pick up their class colour */
+.tabs [data-class] a { border-top: 3px solid var(--cls, transparent); }
+.tabs [data-class] a[aria-current="page"] { color: var(--cls, var(--mw-ink)); }
+@media (prefers-reduced-motion: reduce) {
+  .class-card, .class-card:hover { transition: none; transform: none; }
+}
+.class-grid .card .slot { margin-bottom: 0.2rem; }
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shortcut-grid li { list-style: none; margin: 0; padding: 0; }
+.shortcut {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 2px solid var(--mw-wood-soft);
+  border-radius: 12px;
+  background: var(--mw-paper);
+  color: var(--mw-ink);
+  text-decoration: none;
+}
+.shortcut:hover { border-color: var(--mw-orange); }
+.shortcut strong { display: block; font-family: var(--mw-display); font-weight: 600; }
+.shortcut small { color: var(--mw-muted); }
+
+/* --- Item browser --- */
+#item-browser { transition: opacity 0.15s; }
+#item-browser.htmx-request { opacity: 0.55; }   /* dims while new results load */
+.name-filter {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+}
+.name-filter input[type="search"] { margin: 0; max-width: 18rem; height: 2.5rem; padding-block: 0; }
+.name-filter button {
+  margin: 0;
+  height: 2.5rem;
+  padding: 0 1.1rem;
+  background: var(--mw-wood);
+  border-color: var(--mw-wood);
+  color: #FFF8EC;
+}
+.results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 0.75rem;
+}
+.results-head p { margin: 0; }
+.pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* --- Item page: tooltip + side windows --- */
+.item-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 21rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  margin-bottom: 1.5rem;
+}
+.item-layout .win { margin-bottom: 1.5rem; }
+.item-layout .win:last-child { margin-bottom: 0; }
+
+/* The in-game item tooltip: the one bold piece on the item page. */
+.tooltip {
+  position: sticky;
+  top: 1rem;
+  padding: 0.9rem 1rem 1rem;
+  background: rgba(29, 40, 70, 0.96);
+  background: color-mix(in srgb, var(--mw-navy) 96%, transparent);
+  border: 2px solid #4A5A85;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35), 0 8px 18px rgba(0, 0, 0, 0.25);
+  color: #FFFFFF;
+  font-family: var(--mw-pixel);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.tooltip h1 {
+  margin: 0 0 0.6rem;
+  font-family: var(--mw-pixel);
+  font-size: 1.35rem;
+  font-weight: 400;
+  color: var(--mw-gold);
+  text-align: center;
+  line-height: 1.25;
+}
+.tooltip .top {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+.tooltip .icon-frame {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  flex: none;
+  border-radius: 8px;
+  background: #FFFFFF;
+  box-shadow: inset 0 0 0 2px #C9D2EA;
+}
+.tooltip .icon-frame .icon { width: 64px; height: 64px; }
+.tooltip .reqs { margin: 0; padding: 0; list-style: none; }
+.tooltip li { color: #FFFFFF; }
+.tooltip .reqs li { list-style: none; margin: 0; padding: 0; }
+.tooltip .reqs li.dim, .tooltip li.dim { color: #8C96B3; }
+.tooltip .dim { color: #8C96B3; }
+.tooltip .jobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tooltip .jobs li { list-style: none; margin: 0; padding: 0; color: #6E7898; }
+.tooltip .jobs li.can { color: #FFFFFF; }
+.tooltip hr {
+  margin: 0.7rem 0;
+  border: 0;
+  border-top: 1px dashed #56648F;
+}
+.tooltip .lines { margin: 0; padding: 0; list-style: none; }
+.tooltip .lines li { list-style: none; margin: 0; padding: 0; }
+.tooltip .lines .val { color: #FFFFFF; }
+.tooltip .lines .key { color: #C9D2EA; }
+.tooltip .desc { margin: 0.6rem 0 0; color: #E3E8F6; }
+.tooltip .sell { margin: 0.6rem 0 0; color: #FFE38A; }
+.tooltip .sell.no { color: #FF9C8F; }
+
+/* "How to get it" groups inside one window */
+.get-group { padding: 0.25rem 0 0.75rem; }
+.get-group + .get-group { border-top: 2px dashed var(--mw-wood-soft); padding-top: 0.75rem; }
+.get-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+.recipe { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.recipe .plus { color: var(--mw-muted); font-weight: 700; }
+.recipe .ing-text {
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  background: var(--mw-paper-2);
+  font-size: 0.85rem;
+}
+
+/* --- Monster / NPC hero: sprite on a little sky-and-grass stage --- */
+.hero {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: center;
+  margin: 0.5rem 0 1.5rem;
+}
+.stage {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  height: 11rem;
+  padding: 0 0.5rem 1.1rem;
+  border: 3px solid var(--mw-wood);
+  border-radius: 14px;
+  background: var(--mw-sky-top);
+  box-shadow: var(--mw-shadow);
+  overflow: hidden;
+}
+.stage::after {
+  /* the grass strip the sprite stands on */
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1.1rem;
+  background: var(--mw-grass);
+  border-top: 3px solid color-mix(in srgb, var(--mw-grass) 70%, #000);
+}
+.stage img {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  max-height: 9rem;
+  width: auto;
+  height: auto;
+  image-rendering: pixelated;
+}
+.hero h1 { margin-bottom: 0.4rem; }
+.stat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+.stat-chips li {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+  border-radius: 10px;
+  background: var(--mw-paper);
+  border: 2px solid var(--mw-wood-soft);
+}
+.stat-chips .k { color: var(--mw-muted); font-size: 0.85rem; margin-right: 0.3rem; }
+.stat-chips .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+.map-list { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
+.map-list li { list-style: none; margin: 0; }
+
+/* Drop cards on monster pages */
+.drop-card { gap: 0.35rem; }
+.drop-card .rates { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+
+/* Town windows on /shops */
+.town-grid .card .sprite-box { height: 72px; }
+.town-grid .card .sprite-box img { max-height: 72px; }
+
+/* =====================================================================
+   6. Market
+   ===================================================================== */
+.price-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+.price-summary li { list-style: none; margin: 0; }
+.price-summary .k { display: block; font-size: 0.85rem; color: var(--mw-muted); }
+.price-summary .v { font-size: 1.25rem; }
+.chart-box {
+  position: relative;
+  height: 260px;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+.chart-caption { font-size: 0.85rem; color: var(--mw-muted); margin: 0 0 1rem; }
+.report-form {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: var(--mw-paper-2);
+}
+.report-form h3 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+.report-form .fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0 0.75rem;
+}
+.report-form button { margin-bottom: 0; }
+.form-result { margin-top: 0.5rem; }
+.form-result p { margin: 0.25rem 0 0; }
+.form-result .ok    { color: var(--pico-ins-color); font-weight: 700; }
+.form-result .error { color: var(--pico-del-color); font-weight: 700; }
+details.recent { margin: 1rem 0 0; }
+details.recent summary { font-family: var(--mw-display); font-weight: 500; }
+.table-wrap { overflow-x: auto; }
+table { --pico-background-color: transparent; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+
+/* Data notes (test monsters, NPC notes): a soft warning strip. Inside a card it stays a plain pill. */
+p.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+  padding: 0.45rem 0.75rem;
+  border-left: 4px solid var(--pico-del-color);
+  border-radius: 8px;
+  background: var(--mw-paper);
+  font-size: 0.9rem;
+}
+.card .notice .pill { white-space: normal; }
+
+/* Source credit line at the bottom of detail pages */
+.credits { font-size: 0.85rem; color: var(--mw-muted); }
+
+/* =====================================================================
+   7. Footer, phones, reduced motion
+   ===================================================================== */
+.site-footer {
+  margin-top: 2.5rem;
+  padding: 1.25rem 0 2rem;
+  border-top: 3px solid var(--mw-wood-soft);
+  font-size: 0.85rem;
+  color: var(--mw-muted);
+}
+.site-footer p { margin-bottom: 0.3rem; }
+
+/* Tablets and phones: stack the item page; tooltip first. */
+@media (max-width: 860px) {
+  .item-layout { grid-template-columns: minmax(0, 1fr); }
+  .tooltip { position: static; max-width: 26rem; }
+}
+@media (max-width: 576px) {
+  h1 { font-size: 1.95rem; }
+  .home-hero h1 { font-size: 1.95rem; }
+  .site-header .search-box { max-width: none; margin-left: 0; flex-basis: 100%; }
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .stage { height: 9rem; }
+  .filter-row { flex-direction: column; gap: 0.3rem; }
+  .filter-row > .label { width: auto; padding-top: 0; }
+  .card-grid { grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); }
+  .chart-box { height: 210px; }
+  .win-body { padding: 0.75rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

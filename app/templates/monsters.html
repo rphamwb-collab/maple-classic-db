@@ -1,0 +1,57 @@
+{#
+  monsters.html: browse monsters by level (GET /monsters?level=11-20).
+  Variables (docs/api-contract.md):
+    monsters       [{id, name, level, hp, exp, maps, drop_count}]   sorted by level then name
+    level_options  [Option]  "All levels" first; each also has icon_monster_id (a monster picture)
+    filters        {level}
+    total          int
+
+  HTMX: clicking a level chip fetches the page and swaps in only #monster-browser
+  (hx-select picks it out of the full page), and the URL updates so it can be shared.
+#}
+{% extends "base.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Monsters{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Monsters</h1>
+  <p>What each monster drops, with known and player-observed drop rates.</p>
+</div>
+
+<div id="monster-browser"
+     hx-target="#monster-browser"
+     hx-select="#monster-browser"
+     hx-swap="outerHTML"
+     hx-push-url="true">
+  <section class="win" aria-label="Monsters">
+    <div class="win-body">
+      {{ m.filter_row("Level", level_options, kind="monsters", monster_icons=true) }}
+
+      <div class="results-head">
+        <p><strong>{{ m.num(total) }}</strong> monster{{ '' if total == 1 else 's' }}</p>
+      </div>
+
+      {% if monsters %}
+        <ul class="card-grid">
+          {% for mob in monsters %}
+            <li>
+              <a class="card" href="/monsters/{{ mob.id }}">
+                <span class="sprite-box">{{ m.art("monsters", mob.id, mob.name) }}</span>
+                <span class="name">{{ mob.name }}</span>
+                <span class="meta">Lv {{ mob.level if mob.level is not none else "?" }}{% if mob.hp %}, {{ m.num(mob.hp) }} HP{% endif %}</span>
+                <span class="meta">{% if mob.drop_count %}{{ mob.drop_count }} drop{{ '' if mob.drop_count == 1 else 's' }}{% else %}No known drops{% endif %}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state">
+          <p class="big">No monsters in this level range.</p>
+          <a class="button-link" href="/monsters" hx-get="/monsters">Show all levels</a>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

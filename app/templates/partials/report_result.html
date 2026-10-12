@@ -1,0 +1,19 @@
+{#
+  partials/report_result.html: the short message shown after submitting
+  "Report a price" or "Report a drop". HTMX puts it into the form's result box.
+  Variables:
+    ok       bool  - did it save?
+    message  str   - "Thanks! Price saved." or why it was rejected
+    price_stats (price form only) - {median, low, high, count, outliers_removed}
+    observed    (drop form only)  - {kills, drops_seen, rate_percent, low_confidence, label}
+#}
+{% import "partials/macros.html" as m %}
+<p class="{{ 'ok' if ok else 'error' }}" role="status">{{ message }}</p>
+{% if ok and price_stats and price_stats.count %}
+  <p><small>New 30-day median: {{ m.mesos(price_stats.median) }}
+    from {{ price_stats.count }} report{{ '' if price_stats.count == 1 else 's' }}.
+    Reload the page to update the chart.</small></p>
+{% endif %}
+{% if ok and observed %}
+  <p><small>Observed rate now: <strong>{{ observed.label }}</strong></small></p>
+{% endif %}

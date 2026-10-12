@@ -1,0 +1,70 @@
+{#
+  admin.html: recent player reports with delete buttons (GET /admin, password protected).
+  Variables:
+    prices  [{id, item_id, item, price, quantity, world, reported_at, ip}]   newest first
+    drops   [{id, monster_id, monster, item_id, item, kills, drops, world, reported_at, ip}]
+  Each Delete button posts to /admin/{prices|drops}/{id}/delete; with HTMX the row
+  is removed in place, without HTMX the page reloads.
+#}
+{% extends "base.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<h1>Admin: player reports</h1>
+<p class="muted">Newest first. Delete anything that looks fake; the price chart and drop rates update right away.</p>
+
+<section class="win" aria-labelledby="admin-prices">
+  <h2 class="win-title" id="admin-prices">Price reports ({{ prices | length }})</h2>
+  <div class="win-body">
+    {% if prices %}
+    <div class="overflow-auto">
+    <table>
+      <thead><tr><th>When (UTC)</th><th>Item</th><th>Price</th><th>Qty</th><th>World</th><th>IP</th><th></th></tr></thead>
+      <tbody hx-target="closest tr" hx-swap="outerHTML">
+        {% for r in prices %}
+        <tr>
+          <td>{{ r.reported_at.strftime("%Y-%m-%d %H:%M") if r.reported_at else "" }}</td>
+          <td><a href="/items/{{ r.item_id }}">{{ r.item }}</a></td>
+          <td>{{ m.mesos(r.price) }}</td>
+          <td>{{ r.quantity }}</td>
+          <td>{{ r.world }}</td>
+          <td><small>{{ r.ip or "" }}</small></td>
+          <td><form method="post" action="/admin/prices/{{ r.id }}/delete" hx-post="/admin/prices/{{ r.id }}/delete"
+                    hx-confirm="Delete this price report?"><button class="secondary outline">Delete</button></form></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<p>No price reports yet.</p>{% endif %}
+  </div>
+</section>
+
+<section class="win" aria-labelledby="admin-drops">
+  <h2 class="win-title" id="admin-drops">Drop reports ({{ drops | length }})</h2>
+  <div class="win-body">
+    {% if drops %}
+    <div class="overflow-auto">
+    <table>
+      <thead><tr><th>When (UTC)</th><th>Monster</th><th>Item</th><th>Kills</th><th>Drops</th><th>World</th><th>IP</th><th></th></tr></thead>
+      <tbody hx-target="closest tr" hx-swap="outerHTML">
+        {% for r in drops %}
+        <tr>
+          <td>{{ r.reported_at.strftime("%Y-%m-%d %H:%M") if r.reported_at else "" }}</td>
+          <td><a href="/monsters/{{ r.monster_id }}">{{ r.monster }}</a></td>
+          <td><a href="/items/{{ r.item_id }}">{{ r.item }}</a></td>
+          <td>{{ r.kills }}</td>
+          <td>{{ r.drops }}</td>
+          <td>{{ r.world }}</td>
+          <td><small>{{ r.ip or "" }}</small></td>
+          <td><form method="post" action="/admin/drops/{{ r.id }}/delete" hx-post="/admin/drops/{{ r.id }}/delete"
+                    hx-confirm="Delete this drop report?"><button class="secondary outline">Delete</button></form></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<p>No drop reports yet.</p>{% endif %}
+  </div>
+</section>
+{% endblock %}

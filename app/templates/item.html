@@ -1,0 +1,358 @@
+{#
+  item.html: one item's page (GET /items/{item_id}).
+  Layout: left = the in-game style item tooltip; right = "How to get it" and "Used in";
+  below = the market (prices, chart, report form).
+
+  Variables (docs/api-contract.md):
+    item        {id, name, category, sub_type, level_req, job, equip_slot, weapon_type,
+                 jobs, stats, description, npc_sell_price, icon_url}
+                 jobs = ["Warrior", ...]; [] means any class
+    sellable    True (price known) or None (unknown -> "NPC sell price: Unknown")
+    how_to_get  {shops, drops, recipes, quests}
+                 shops   [{npc: NpcRef, buy_price}]
+                 drops   [{monster: {id,name,level}, rate_percent, rate_label, rate_source, confidence, observed}]
+                 recipes [{discipline, discipline_level, req_level, meso_cost, result_count, ingredients}]
+                 quests  [{quest_name, npc_name, level_min, count, region, reward_type, job}]
+    used_in     [{result: ItemRef, result_count, count, discipline, discipline_level, req_level, meso_cost, ingredients}]
+    Ingredient = {item_id, name, count}   item_id can be None -> show the name as plain text
+    price_stats {median, low, high, count, outliers_removed}   last 30 days
+    recent_reports [{price, quantity, world, reported_at}]
+    worlds, sources
+#}
+{% extends "base.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}{{ item.name }}{% endblock %}
+
+{# Small helper: one recipe's ingredients as slots with stack counts, plus the meso cost. #}
+{% macro ingredients(r) -%}
+  <div class="recipe">
+    {% for ing in r.ingredients %}
+      {% if not loop.first %}<span class="plus" aria-hidden="true">+</span>{% endif %}
+      {% if ing.item_id %}
+        <a href="/items/{{ ing.item_id }}" title="{{ ing.count }} x {{ ing.name }}">{{ m.slot(ing.item_id, ing.name, ing.count) }}<span class="visually-hidden">{{ ing.count }} x {{ ing.name }}</span></a>
+      {% else %}
+        <span class="ing-text">{{ ing.count }} x {{ ing.name }}</span>
+      {% endif %}
+    {% endfor %}
+    {% if r.meso_cost %}<span class="plus" aria-hidden="true">+</span> {{ m.mesos(r.meso_cost) }}{% endif %}
+  </div>
+{%- endmacro %}
+
+{# Text like "Smithing Lv 2, requires Lv 30" for a recipe. #}
+{% macro recipe_meta(r) -%}
+  {%- set bits = [] -%}
+  {%- if r.discipline %}{% set _ = bits.append(r.discipline ~ (" Lv " ~ r.discipline_level if r.discipline_level else "")) %}{% endif -%}
+  {%- if r.req_level %}{% set _ = bits.append("requires Lv " ~ r.req_level) %}{% endif -%}
+  {{ bits | join(", ") }}
+{%- endmacro %}
+
+{% block content %}
+{# Shortcuts so this file reads simply below. #}
+{%- set htg = how_to_get or {} -%}
+{%- set shops_list = htg.shops if htg.shops is defined else shops -%}
+{%- set drops_list = htg.drops if htg.drops is defined else drops -%}
+{%- set recipes = htg.recipes or [] -%}
+{%- set quests = htg.quests or [] -%}
+{%- set is_equip = item.category == "equip" -%}
+{%- set stats = item.stats or {} -%}
+
+<!-- Breadcrumb back into the item browser -->
+<p class="breadcrumb">
+  <a href="/items">Items</a>
+  {% if item.category %} / <a href="/items?type={{ item.category }}">{{ item.category | capitalize }}</a>{% if item.sub_type == 'Scroll' %} / <a href="/items?type=use&amp;use=scroll">Scrolls</a>{% endif %}{% endif %}
+  {% if item.equip_slot %} / <a href="/items?type=equip&amp;slot={{ item.equip_slot | lower }}">{{ item.equip_slot }}</a>{% endif %}
+</p>
+
+<div class="item-layout">
+
+  <!-- ===== Left: the item tooltip, styled like the game's ===== -->
+  <div class="tooltip" role="region" aria-label="Item details">
+    <h1>{{ item.name }}</h1>
+    <div class="top">
+      <div class="icon-frame">{{ m.sprite("items", item.id, item.name, "icon-lg", alt=item.name ~ " icon") }}</div>
+      {# Requirement lines, like the game: REQ LEV, then REQ STR/DEX/INT/LUK/FAME
+         (these live in item.stats as req_str, req_dex ...). Zero requirements are dimmed. #}
+      <ul class="reqs">
+        {% if item.level_req %}<li>REQ LEV : {{ item.level_req }}</li>
+        {% elif not is_equip %}<li class="dim">{{ item.sub_type or (item.category or 'Item') | capitalize }}</li>
+        {% else %}<li class="dim">REQ LEV : 0</li>{% endif %}
+        {% for key, label in [("req_str", "STR"), ("req_dex", "DEX"), ("req_int", "INT"), ("req_luk", "LUK"), ("req_fame", "FAME")] %}
+          {% if key in stats %}<li class="{{ 'dim' if not stats[key] }}">REQ {{ label }} : {{ stats[key] }}</li>{% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+
+    {# Which classes can wear it: lit = yes, dim = no. [] means every class. #}
+    {% if is_equip %}
+      <ul class="jobs" aria-label="Classes that can use this">
+        {% for job in ["Beginner", "Warrior", "Magician", "Bowman", "Thief"] %}
+          {% set can = (not item.jobs) or (job in item.jobs) %}
+          <li class="{{ 'can' if can }}">{{ job }}{% if not can %}<span class="visually-hidden"> (can't use)</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {#
+      Stat lines, in game order: category, attack speed, bonuses, upgrade slots.
+      Keys shown elsewhere (requirements, attack speed, stack size, slots) are skipped
+      in the general loop so nothing appears twice.
+    #}
+    {%- set special = ["req_str", "req_dex", "req_int", "req_luk", "req_fame", "attack_speed", "max_stack", "slots"] -%}
+    {%- set category_text = item.weapon_type or item.equip_slot or item.sub_type -%}
+    <hr>
+    <ul class="lines">
+      {% if category_text %}<li><span class="key">Category :</span> <span class="val">{{ category_text }}</span></li>{% endif %}
+      {% if stats.attack_speed %}
+        {# Old client wording: lower number = faster. #}
+        {%- set sp = stats.attack_speed -%}
+        {%- set speed_word = "Faster" if sp <= 3 else "Fast" if sp == 4 else "Normal" if sp <= 6 else "Slow" if sp <= 8 else "Slower" -%}
+        <li><span class="key">Attack Speed :</span> <span class="val">{{ speed_word }}</span></li>
+      {% endif %}
+      {% for key, value in stats.items() if key not in special %}
+        <li><span class="key">{{ m.stat_label(key) }} :</span> <span class="val">{{ m.stat_value(key, value) }}</span></li>
+      {% endfor %}
+      {% if stats.slots is defined and is_equip %}
+        <li><span class="key">Number of upgrades available :</span> <span class="val">{{ stats.slots }}</span></li>
+      {% endif %}
+      {% if stats.max_stack and not is_equip %}
+        <li class="dim">Stacks up to {{ stats.max_stack }}</li>
+      {% endif %}
+    </ul>
+
+    {% if item.description %}
+      <hr>
+      <p class="desc">{{ item.description }}</p>
+    {% endif %}
+
+    <hr>
+    {# sellable: True = price known; None = unknown (no source had a price); False = can't be sold. #}
+    {% if sellable %}
+      <p class="sell">Sells to NPCs for {{ m.mesos(item.npc_sell_price) }}</p>
+    {% elif sellable is sameas false %}
+      <p class="sell no">Can't be sold to NPCs</p>
+    {% else %}
+      <p class="sell no">NPC sell price: Unknown</p>
+    {% endif %}
+  </div>
+
+  <!-- ===== Right: how to get it + used in ===== -->
+  <div>
+    <section class="win" aria-labelledby="get-title">
+      <h2 class="win-title" id="get-title">How to get it</h2>
+      <div class="win-body">
+        {% if not (shops_list or drops_list or recipes or quests) %}
+          <div class="empty-state">
+            <p class="big">We don't know where this comes from yet.</p>
+            <p class="muted">It may be a quest item, an event item or a cash item.</p>
+          </div>
+        {% endif %}
+
+        {# --- Buy from an NPC --- #}
+        {% if shops_list %}
+          <div class="get-group">
+            <h3>Buy from an NPC</h3>
+            <ul class="rows">
+              {% for s in shops_list %}
+                <li>
+                  <span class="slot">{{ m.sprite("npcs", s.npc.id, s.npc.name) }}</span>
+                  <span class="main">
+                    <a href="/npcs/{{ s.npc.id }}">{{ s.npc.name }}</a>
+                    <span class="sub">{{ s.npc.location or s.npc.town or "Location unknown" }}</span>
+                  </span>
+                  <span class="end">{{ m.mesos(s.buy_price) }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        {# --- Dropped by monsters --- #}
+        {% if drops_list %}
+          <div class="get-group">
+            <h3>Dropped by</h3>
+            <ul class="rows">
+              {% for d in drops_list %}
+                <li>
+                  <span class="slot">{{ m.sprite("monsters", d.monster.id, d.monster.name) }}</span>
+                  <span class="main">
+                    <a href="/monsters/{{ d.monster.id }}">{{ d.monster.name }}</a>
+                    <span class="sub">{% if d.monster.level %}Lv {{ d.monster.level }}{% else %}Level unknown{% endif %}</span>
+                  </span>
+                  <span class="end">
+                    {{ m.rate_pill(d) }}
+                    <span class="sub">{{ m.observed_pill(d.observed) }}</span>
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+            <p class="muted" style="font-size:.85rem;margin:.5rem 0 0">Dark pill = rate from a data source. Green pill = what players have seen.
+              Report your own kills on a monster's page.</p>
+            {{ m.old_version_note(drops_list) }}
+          </div>
+        {% endif %}
+
+        {# --- Crafting --- #}
+        {% if recipes %}
+          <div class="get-group">
+            <h3>Craft it</h3>
+            <ul class="rows">
+              {% for r in recipes %}
+                <li>
+                  <span class="main">
+                    {{ ingredients(r) }}
+                    <span class="sub">{{ recipe_meta(r) }}{% if r.result_count and r.result_count > 1 %}{{ ", " if recipe_meta(r) | trim }}makes {{ r.result_count }}{% endif %}</span>
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        {# --- Quest rewards --- #}
+        {% if quests %}
+          <div class="get-group">
+            <h3>Quest reward</h3>
+            <ul class="rows">
+              {% for q in quests %}
+                <li>
+                  <span class="main">
+                    <strong>{{ q.quest_name }}</strong>
+                    <span class="sub">
+                      {%- if q.npc_name %}From {{ q.npc_name }}{% endif -%}
+                      {%- if q.region %}{{ " in " if q.npc_name else "In " }}{{ q.region }}{% endif -%}
+                      {%- if q.level_min %}{{ ", " if (q.npc_name or q.region) }}Lv {{ q.level_min }}+{% endif -%}
+                    </span>
+                  </span>
+                  <span class="end">
+                    {% if q.reward_type == "random" %}<span class="pill pill-tag">Random reward</span>
+                    {% elif q.reward_type == "choice" %}<span class="pill pill-tag">You choose one</span>
+                    {% else %}<span class="pill pill-observed">Guaranteed</span>{% endif %}
+                    {% if q.job or (q.count and q.count > 1) %}
+                      <span class="sub">{% if q.count and q.count > 1 %}x{{ q.count }}{% endif %}{% if q.job %}{{ ", " if q.count and q.count > 1 }}{{ q.job }} only{% endif %}</span>
+                    {% endif %}
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    {# --- Used in: recipes that need this item --- #}
+    {% if used_in %}
+      <section class="win" aria-labelledby="used-title">
+        <h2 class="win-title" id="used-title">Used to craft <span class="count">{{ used_in | length }}</span></h2>
+        <div class="win-body">
+          <ul class="rows">
+            {% for u in used_in %}
+              <li>
+                {{ m.slot(u.result.id, u.result.name, u.result_count) }}
+                <span class="main">
+                  <a href="/items/{{ u.result.id }}">{{ u.result.name }}</a>
+                  <span class="sub">Needs {{ u.count }} of this{% if recipe_meta(u) | trim %}, {{ recipe_meta(u) }}{% endif %}</span>
+                </span>
+                {% if u.meso_cost %}<span class="end">{{ m.mesos(u.meso_cost) }}</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===== Market ===== -->
+<section class="win" id="market" aria-labelledby="market-title">
+  <h2 class="win-title" id="market-title">Market prices <span class="count">player-reported, last 30 days</span></h2>
+  <div class="win-body">
+
+    {% if price_stats and price_stats.count %}
+      {# Summary numbers #}
+      <ul class="price-summary">
+        <li><span class="k">Median price</span><span class="v">{{ m.mesos(price_stats.median) }}</span></li>
+        <li><span class="k">Usual range</span><span class="v">{{ m.mesos(price_stats.low) }} to {{ m.mesos(price_stats.high) }}</span></li>
+        <li><span class="k">Reports</span><span class="v">{{ price_stats.count }}</span>
+          {% if price_stats.outliers_removed %}<span class="k">{{ price_stats.outliers_removed }} extreme price{{ '' if price_stats.outliers_removed == 1 else 's' }} ignored</span>{% endif %}
+        </li>
+      </ul>
+
+      {# Price chart: static/js/price-chart.js fills this from the price-history API. #}
+      <div class="chart-box">
+        <canvas id="price-chart" data-url="/api/items/{{ item.id }}/price-history"
+                aria-label="Daily median price for {{ item.name }} over the last 30 days" role="img"></canvas>
+      </div>
+      <p class="chart-caption">Line: the median price each day. Shaded band: that day's low to high. Extreme prices are left out.</p>
+    {% else %}
+      {# Nothing reported yet: a friendly empty state instead of a blank chart. #}
+      <div class="empty-state">
+        <div class="coin-stack" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="big">No prices reported yet. Be the first.</p>
+        <p class="muted">Bought or sold a {{ item.name }} in the Free Market? Add the price below and a chart will appear here.</p>
+        <a class="button-link" href="#price-input">Report a price</a>
+      </div>
+    {% endif %}
+
+    {#
+      Report a price form.
+      With HTMX: posts in the background and shows partials/report_result.html in #price-result.
+      Without JavaScript: a normal form post; the server redirects back to this page.
+      Field names: price, quantity, world
+    #}
+    <form class="report-form" method="post" action="/items/{{ item.id }}/prices"
+          hx-post="/items/{{ item.id }}/prices"
+          hx-target="#price-result"
+          hx-swap="innerHTML">
+      <h3>Report a price</h3>
+      <div class="fields">
+        <label>Price per unit (mesos)
+          <input id="price-input" type="number" name="price" min="1" step="1" required inputmode="numeric" placeholder="e.g. 1500">
+        </label>
+        <label>Quantity
+          <input type="number" name="quantity" min="1" max="10000" step="1" value="1" required inputmode="numeric">
+        </label>
+        <label>World
+          <select name="world" required>
+            <option value="" disabled selected>Choose a world</option>
+            {% for w in worlds or [] %}<option value="{{ w }}">{{ w }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      <button type="submit">Submit price</button>
+      <div id="price-result" class="form-result" aria-live="polite"></div>
+    </form>
+
+    {# Most recent reports #}
+    {% if recent_reports %}
+      <details class="recent">
+        <summary>Recent reports ({{ recent_reports | length }})</summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>When (UTC)</th><th>World</th><th class="num">Price</th><th class="num">Qty</th></tr></thead>
+            <tbody>
+            {% for r in recent_reports %}
+              <tr>
+                <td>{{ r.reported_at }}</td>
+                <td>{{ r.world }}</td>
+                <td class="num">{{ m.mesos(r.price) }}</td>
+                <td class="num">{{ r.quantity }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    {% endif %}
+  </div>
+</section>
+
+{{ m.source_credits(sources) }}
+{% endblock %}
+
+{% block scripts %}
+  {# Only load Chart.js when there's something to draw. #}
+  {% if price_stats and price_stats.count %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="{{ url_for('static', path='js/price-chart.js') }}"></script>
+  {% endif %}
+{% endblock %}

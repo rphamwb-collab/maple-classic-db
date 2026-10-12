@@ -1,0 +1,115 @@
+{#
+  monster.html: one monster's page (GET /monsters/{monster_id}).
+  Variables (docs/api-contract.md):
+    monster  {id, name, level, hp, exp, maps, hidden, note}   maps = list of map names
+             hidden = True for test/unreleased mobs; note = str or None
+    drops    [{item: {id, name, category}, rate_percent, rate_label, rate_source, confidence, observed}]
+             observed = {kills, drops_seen, rate_percent, low_confidence, label}
+    worlds   list of world names for the drop form
+    sources  [{name, url, last_scraped}]
+#}
+{% extends "base.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}{{ monster.name }}{% endblock %}
+
+{% block content %}
+<p class="breadcrumb"><a href="/monsters">Monsters</a></p>
+
+<!-- ===== Hero: the monster standing on a little patch of grass ===== -->
+<div class="hero">
+  <div class="stage">{{ m.art("monsters", monster.id, monster.name, alt=monster.name) }}</div>
+  <div>
+    <h1>{{ monster.name }}</h1>
+    {% if monster.hidden %}<p class="notice"><span class="pill pill-warn">Test/unreleased monster</span> Not part of normal Classic gameplay.</p>{% endif %}
+    {{ m.notice(monster.note) }}
+    <ul class="stat-chips">
+      <li><span class="k">Level</span><span class="v">{{ m.val(monster.level) }}</span></li>
+      <li><span class="k">HP</span><span class="v">{{ m.num(monster.hp) }}</span></li>
+      <li><span class="k">EXP</span><span class="v">{{ m.num(monster.exp) }}</span></li>
+    </ul>
+    {% if monster.maps %}
+      <p class="muted" style="margin-bottom:.35rem">Found in</p>
+      <ul class="map-list">
+        {% for map in monster.maps %}<li class="pill pill-tag">{{ map }}</li>{% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">We don't know where it spawns yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===== Drops, laid out like loot on the ground ===== -->
+<section class="win" aria-labelledby="drops-title">
+  <h2 class="win-title" id="drops-title">Drops {% if drops %}<span class="count">{{ drops | length }} items</span>{% endif %}</h2>
+  <div class="win-body">
+    {% if drops %}
+      <ul class="card-grid">
+        {% for d in drops %}
+          <li>
+            <div class="card drop-card">
+              {{ m.slot(d.item.id, d.item.name) }}
+              <a class="name" href="/items/{{ d.item.id }}">{{ d.item.name }}</a>
+              <span class="rates">
+                {{ m.rate_pill(d) }}
+                {{ m.observed_pill(d.observed) }}
+              </span>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+      {{ m.old_version_note(drops) }}
+    {% else %}
+      <div class="empty-state">
+        <p class="big">No known drops for this monster.</p>
+        <p class="muted">If you've seen it drop something, our data sources may not have it yet.</p>
+      </div>
+    {% endif %}
+  </div>
+  {% if drops %}
+    <p class="win-note">Real drop rates aren't in the game files. Dark pills come from a data source when one has the rate.
+      Green pills are total drops divided by total kills that players reported; under 100 kills is marked "small sample".</p>
+  {% endif %}
+</section>
+
+<!-- ===== Report a drop =====
+  With HTMX: posts in the background and shows partials/report_result.html in #drop-result.
+  Without JavaScript: a normal form post; the server redirects back to this page.
+  Field names: item_id, kills, drops, world (world is optional)
+-->
+{% if drops %}
+<section class="win" aria-labelledby="report-title">
+  <h2 class="win-title" id="report-title">Report a drop</h2>
+  <div class="win-body">
+    <p>Hunted {{ monster.name }}? Tell us how many you killed and how many times an item dropped. Reporting 0 drops helps too.</p>
+    <form class="report-form" style="margin-top:0" method="post" action="/monsters/{{ monster.id }}/drops"
+          hx-post="/monsters/{{ monster.id }}/drops"
+          hx-target="#drop-result"
+          hx-swap="innerHTML">
+      <div class="fields">
+        <label>Item
+          <select name="item_id" required>
+            {% for d in drops %}<option value="{{ d.item.id }}">{{ d.item.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Kills
+          <input type="number" name="kills" min="1" max="100000" step="1" required inputmode="numeric" placeholder="e.g. 300">
+        </label>
+        <label>Times it dropped
+          <input type="number" name="drops" min="0" step="1" value="0" required inputmode="numeric">
+        </label>
+        <label>World <small class="muted">(optional)</small>
+          <select name="world">
+            <option value="">Not sure</option>
+            {% for w in worlds or [] %}<option value="{{ w }}">{{ w }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      <button type="submit">Submit drop report</button>
+      <div id="drop-result" class="form-result" aria-live="polite"></div>
+    </form>
+  </div>
+</section>
+{% endif %}
+
+{{ m.source_credits(sources) }}
+{% endblock %}

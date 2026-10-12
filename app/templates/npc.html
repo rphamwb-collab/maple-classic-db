@@ -1,0 +1,56 @@
+{#
+  npc.html: one NPC's page (GET /npcs/{npc_id}).
+  Variables (docs/api-contract.md):
+    npc      {id, name, town, map_name, location, note}   location is ready-made, e.g. "Henesys Market, Henesys"
+             note = str or None, e.g. "Not open in this release"
+    shop     [{item: {id, name, category}, buy_price}]   sorted by item name
+    sources  [{name, url, last_scraped}]
+#}
+{% extends "base.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}{{ npc.name }}{% endblock %}
+
+{% block content %}
+<p class="breadcrumb"><a href="/shops">Shops</a>{% if npc.town %} / {{ npc.town }}{% endif %}</p>
+
+<!-- ===== Hero ===== -->
+<div class="hero">
+  <div class="stage">{{ m.art("npcs", npc.id, npc.name, alt=npc.name) }}</div>
+  <div>
+    <h1>{{ npc.name }}</h1>
+    <p class="muted">{{ npc.location or npc.town or "Location unknown" }}</p>
+    {{ m.notice(npc.note) }}
+    {% if shop %}<p><span class="pill pill-tag">Sells {{ shop | length }} item{{ '' if shop | length == 1 else 's' }}</span></p>{% endif %}
+  </div>
+</div>
+
+<!-- ===== Shop list, like the in-game shop window ===== -->
+<section class="win" aria-labelledby="shop-title">
+  <h2 class="win-title" id="shop-title">Shop</h2>
+  <div class="win-body">
+    {% if shop %}
+      <ul class="rows">
+        {% for s in shop %}
+          <li>
+            {{ m.slot(s.item.id, s.item.name) }}
+            <span class="main">
+              <a href="/items/{{ s.item.id }}">{{ s.item.name }}</a>
+              {% if s.item.category %}<span class="sub">{{ s.item.category | capitalize }}</span>{% endif %}
+            </span>
+            <span class="end">{{ m.mesos(s.buy_price) }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty-state">
+        <p class="big">This NPC doesn't sell anything.</p>
+        <p class="muted">Or we don't have their shop list yet.</p>
+        <a class="button-link" href="/shops">See all shops</a>
+      </div>
+    {% endif %}
+  </div>
+  {% if shop %}<p class="win-note">Prices are what you pay the NPC.</p>{% endif %}
+</section>
+
+{{ m.source_credits(sources) }}
+{% endblock %}

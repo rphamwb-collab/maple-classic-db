@@ -1,0 +1,23 @@
+{#
+  partials/search_suggestions.html: the dropdown list under a search bar.
+  Rendered by GET /api/search?q=... and inserted by HTMX into the suggestions <ul>.
+  Variables: q (str), results = {items: [...], monsters: [...], npcs: [...]} (max 8 each)
+  If q is blank we output nothing, so the dropdown hides itself (CSS :empty).
+#}
+{% import "partials/macros.html" as m %}
+{% if q %}
+  {% for it in results["items"] %}
+    <li><a href="/items/{{ it.id }}">{{ m.sprite("items", it.id, it.name) }} <span>{{ it.name }}</span> <span class="kind-tag">{{ (it.category or "item") | capitalize }}</span></a></li>
+  {% endfor %}
+  {% for mob in results.monsters %}
+    <li><a href="/monsters/{{ mob.id }}">{{ m.sprite("monsters", mob.id, mob.name) }} <span>{{ mob.name }}</span> <span class="kind-tag">Monster{% if mob.level %}, Lv {{ mob.level }}{% endif %}</span></a></li>
+  {% endfor %}
+  {% for npc in results.npcs %}
+    <li><a href="/npcs/{{ npc.id }}">{{ m.sprite("npcs", npc.id, npc.name) }} <span>{{ npc.name }}</span> <span class="kind-tag">NPC{% if npc.town %}, {{ npc.town }}{% endif %}</span></a></li>
+  {% endfor %}
+  {% if not results["items"] and not results.monsters and not results.npcs %}
+    <li class="empty">No matches for "{{ q }}". Try a shorter word.</li>
+  {% else %}
+    <li><a class="see-all" href="/search?q={{ q | urlencode }}">See all results for "{{ q }}"</a></li>
+  {% endif %}
+{% endif %}

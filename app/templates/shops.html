@@ -1,0 +1,54 @@
+{#
+  shops.html: every NPC shop, grouped by town (GET /shops; /npcs redirects here).
+  Variables (docs/api-contract.md):
+    towns        [{town, shop_count, shops: [{npc: NpcRef, item_count}]}]   towns A-Z, "Other" last
+    total_shops  int
+  NpcRef = {id, name, town, map_name, location, note}   note = str or None
+#}
+{% extends "base.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Shops by town{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Shops by town</h1>
+  <p>{{ m.num(total_shops) }} NPCs sell items. Open one to see its full price list.</p>
+</div>
+
+{# Quick jump links to each town (handy on phones where the page is long). #}
+{% if towns | length > 1 %}
+  <nav aria-label="Towns">
+    <ul class="chips" style="margin-bottom:1.25rem">
+      {% for t in towns %}
+        <li><a class="chip no-icon" href="#town-{{ loop.index }}">{{ t.town }} <span class="count">{{ t.shop_count }}</span></a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+{% endif %}
+
+{% for t in towns %}
+  <section class="win town-grid" id="town-{{ loop.index }}" aria-labelledby="town-title-{{ loop.index }}">
+    <h2 class="win-title" id="town-title-{{ loop.index }}">{{ t.town }} <span class="count">{{ t.shop_count }} shop{{ '' if t.shop_count == 1 else 's' }}</span></h2>
+    <div class="win-body">
+      <ul class="card-grid">
+        {% for s in t.shops %}
+          <li>
+            <a class="card" href="/npcs/{{ s.npc.id }}">
+              <span class="sprite-box">{{ m.art("npcs", s.npc.id, s.npc.name) }}</span>
+              <span class="name">{{ s.npc.name }}</span>
+              {% if s.npc.map_name %}<span class="meta">{{ s.npc.map_name }}</span>{% endif %}
+              <span class="meta">{{ s.item_count }} item{{ '' if s.item_count == 1 else 's' }}</span>
+              {% if s.npc.note %}<span class="meta notice"><span class="pill pill-warn">{{ s.npc.note }}</span></span>{% endif %}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+{% else %}
+  <div class="empty-state">
+    <p class="big">No shop data yet.</p>
+    <a class="button-link" href="/items">Browse items instead</a>
+  </div>
+{% endfor %}
+{% endblock %}

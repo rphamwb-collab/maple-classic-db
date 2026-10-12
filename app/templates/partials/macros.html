@@ -1,0 +1,155 @@
+{#
+  partials/macros.html: small reusable pieces, like functions for templates.
+  Use them in a page with:
+    {% import "partials/macros.html" as m %}
+    {{ m.mesos(1200) }}
+#}
+
+{# Mesos amount with a little gold coin, e.g. (coin) 12,500. None shows "—". #}
+{% macro mesos(n) -%}
+  {%- if n is none or n is undefined -%}<span class="muted">—</span>
+  {%- else -%}{%- set unit = "meso" if n == 1 else "mesos" -%}
+  <span class="mesos" title="{{ '{:,}'.format(n) }} {{ unit }}">{{ "{:,}".format(n) }}<span class="visually-hidden"> {{ unit }}</span></span>{%- endif -%}
+{%- endmacro %}
+
+{# Plain number with commas. None shows "—". #}
+{% macro num(n) -%}
+  {%- if n is none or n is undefined -%}<span class="muted">—</span>
+  {%- else -%}{{ "{:,}".format(n) }}{%- endif -%}
+{%- endmacro %}
+
+{# Any value, or "—" if missing. #}
+{% macro val(v) -%}
+  {%- if v is none or v is undefined or v == "" -%}<span class="muted">—</span>
+  {%- else -%}{{ v }}{%- endif -%}
+{%- endmacro %}
+
+{#
+  Picture of an item / monster / NPC, found by game ID.
+  If the image file is missing, the browser swaps in the placeholder leaf.
+    kind: "items" | "monsters" | "npcs"
+    alt:  leave "" when the name is written right next to the picture (screen readers
+          would otherwise read the name twice). Pass the name when the picture stands alone.
+#}
+{% macro sprite(kind, id, name, size="", alt="") -%}
+  {%- set ext = "webp" if kind == "monsters" else "png" -%}
+  <img class="icon {{ size }}" src="/static/img/{{ kind }}/{{ id }}.{{ ext }}" alt="{{ alt }}" loading="lazy"
+       title="{{ name }}" onerror="this.onerror=null;this.src='/static/img/placeholder.svg'">
+{%- endmacro %}
+
+{# Big monster/NPC art without the fixed 32px icon size (used on stages and cards). #}
+{% macro art(kind, id, name, alt="") -%}
+  {%- set ext = "webp" if kind == "monsters" else "png" -%}
+  <img src="/static/img/{{ kind }}/{{ id }}.{{ ext }}" alt="{{ alt }}" loading="lazy"
+       title="{{ name }}" onerror="this.onerror=null;this.src='/static/img/placeholder.svg'">
+{%- endmacro %}
+
+{# An item icon inside an inventory slot. qty (optional) shows a stack number in the corner. #}
+{% macro slot(id, name, qty=none, size="") -%}
+  <span class="slot {{ size }}">{{ sprite("items", id, name) }}{% if qty and qty > 1 %}<span class="qty" aria-hidden="true">{{ qty }}</span>{% endif %}</span>
+{%- endmacro %}
+
+{#
+  One filter/tab option as a link (shape "Option" in docs/api-contract.md).
+  hx-get loads only the results area; the URL in the address bar updates too,
+  so the link can be shared. Without JavaScript it's a normal link.
+    kind: picture folder ("items" or "monsters"); icon_id: which picture.
+#}
+{% macro chip(o, kind="items", icon_id=none) -%}
+  {%- set pic = icon_id if icon_id is not none else o.icon_item_id -%}
+  <a class="chip{% if pic is none %} no-icon{% endif %}" href="{{ o.url }}" hx-get="{{ o.url }}"
+     {% if o.active %}aria-current="true"{% endif %}>
+    {%- if pic is not none %}{{ sprite(kind, pic, o.label) }}{% endif -%}
+    <span>{{ o.label }}</span>{% if o.count is not none %} <span class="count">{{ o.count }}</span>{% endif -%}
+  </a>
+{%- endmacro %}
+
+{# One row of filter chips with a label on the left. Hidden when there are no options. #}
+{% macro filter_row(label, options, kind="items", monster_icons=false) -%}
+  {%- if options -%}
+  <div class="filter-row" role="group" aria-label="{{ label }}">
+    <span class="label">{{ label }}</span>
+    <ul class="chips">
+      {% for o in options %}<li>{{ chip(o, kind, o.icon_monster_id if monster_icons else none) }}</li>{% endfor %}
+    </ul>
+  </div>
+  {%- endif -%}
+{%- endmacro %}
+
+{#
+  Turn a stats key into a readable label, using the game's own wording where we can.
+  Stats keys are all lowercase snake_case (see docs/data-contract.md).
+#}
+{% macro stat_label(key) -%}
+  {%- set labels = {
+    "str": "STR", "dex": "DEX", "int": "INT", "luk": "LUK", "hp": "MaxHP", "mp": "MaxMP",
+    "weapon_attack": "Weapon Attack", "magic_attack": "Magic Attack",
+    "weapon_def": "Weapon Def.", "magic_def": "Magic Def.",
+    "accuracy": "Accuracy", "avoid": "Avoidability", "speed": "Speed", "jump": "Jump",
+    "slots": "Number of upgrades available", "success_rate": "Success rate",
+    "heal_hp": "Recovers HP", "heal_mp": "Recovers MP"
+  } -%}
+  {{ labels.get(key, key.replace("_", " ") | title) }}
+{%- endmacro %}
+
+{# Stat value. Equip bonuses get a "+", success rate gets a "%". #}
+{% macro stat_value(key, value) -%}
+  {%- if key in ("success_rate", "success") -%}{{ value }}%
+  {%- elif key in ("slots", "heal_hp", "heal_mp") -%}{{ value }}
+  {%- elif value is number and value > 0 -%}+{{ value }}
+  {%- else -%}{{ value }}{%- endif -%}
+{%- endmacro %}
+
+{#
+  Known drop rate as a pill. Unknown rates get a dashed "Unknown" pill so nobody
+  mistakes them for real numbers.
+  "estimated" rows come from an older game version (v83), so they get a clear warning.
+#}
+{% set OLD_VERSION_NOTE = "Older-version estimate. May not drop in Classic." %}
+{% macro rate_pill(d) -%}
+  {%- if d.rate_percent is none -%}
+    <span class="pill pill-unknown" title="No source has a confirmed rate for this drop">Unknown rate</span>
+  {%- else -%}
+    <span class="pill pill-known" title="{% if d.confidence == 'estimated' %}{{ OLD_VERSION_NOTE }}{% else %}Known rate{% if d.rate_source %} from {{ d.rate_source }}{% endif %}{% if d.confidence %} ({{ d.confidence }}){% endif %}{% endif %}">{{ d.rate_label }}</span>
+    {%- if d.confidence == "estimated" %} <span class="pill pill-warn" title="{{ OLD_VERSION_NOTE }}">Older-version estimate</span>
+    {%- elif d.confidence and d.confidence != "verified" %} <span class="pill pill-warn">{{ d.confidence }}</span>{% endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+{# Short line under a drop list when any rate is an older-version estimate. #}
+{% macro old_version_note(drops) -%}
+  {%- if drops | selectattr("confidence", "equalto", "estimated") | list -%}
+    <p class="muted old-version-note" style="font-size:.85rem;margin:.5rem 0 0">{{ OLD_VERSION_NOTE }}</p>
+  {%- endif -%}
+{%- endmacro %}
+
+{# A small notice box, e.g. a monster or NPC note from the data. Shows nothing when empty. #}
+{% macro notice(text) -%}
+  {%- if text -%}<p class="notice"><span class="pill pill-warn">Note</span> {{ text }}</p>{%- endif -%}
+{%- endmacro %}
+
+{#
+  Player-observed rate (from "Report a drop"). Shows the sample size and warns
+  when fewer than 100 kills were reported.
+#}
+{% macro observed_pill(o) -%}
+  {%- if not o or o.rate_percent is none -%}
+    <span class="muted" style="font-size:.8rem">No player reports</span>
+  {%- else -%}
+    <span class="pill pill-observed" title="Player-observed: {{ o.label }}">{{ o.label }}</span>
+    {%- if o.low_confidence %} <span class="pill pill-warn" title="Fewer than 100 kills reported, so this may be far off">small sample</span>{% endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+{# The small credit line at the bottom of each detail page. #}
+{% macro source_credits(sources) -%}
+  {%- if sources -%}
+  <p class="credits">Data on this page from
+    {% for s in sources -%}
+      {%- if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.name }}</a>{% else %}{{ s.name }}{% endif -%}
+      {%- if s.last_scraped %} (updated {{ s.last_scraped }}){% endif -%}
+      {%- if not loop.last %}, {% endif -%}
+    {%- endfor %}.
+  </p>
+  {%- endif -%}
+{%- endmacro %}

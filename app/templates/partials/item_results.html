@@ -1,0 +1,117 @@
+{#
+  partials/item_results.html: class tabs + filters + results for the item browser.
+  Rendered inside items.html, and on its own for HTMX requests (same variables).
+
+  Variables (docs/api-contract.md, GET /items):
+    filters         {class, type, use, gear, slot, weapon, level, q, page}
+    class_tabs      [Option]  All, Beginner, Warrior, Magician, Bowman, Thief
+    type_options    [Option]  "All types" first
+    use_options     [Option]  HP potions / MP potions / HP + MP / Scrolls / Other; only when type=use, else []
+    gear_options    [Option]  Weapons / Clothes / Accessories; only when type=equip, else []
+    slot_options    [Option]  only when gear=clothes or accessories, else []
+    weapon_options  [Option]  only when gear=weapons, else []
+    level_options   [Option]  "All levels" first
+    items           [{id, name, category, sub_type, equip_slot, weapon_type, level_req, jobs}]
+    total, page, pages, prev_url, next_url, clear_url
+  Option = {label, value, count, icon_item_id, active, url}
+
+  HTMX setup: the attributes on the outer <div> are inherited by every link inside,
+  so each link only needs hx-get. The response replaces this whole <div>.
+#}
+{% import "partials/macros.html" as m %}
+<div id="item-browser"
+     hx-target="#item-browser"
+     hx-select="#item-browser"
+     hx-swap="outerHTML"
+     hx-push-url="true"
+     hx-indicator="#item-browser">
+
+  <!-- ===== Class tabs (the only tabs) ===== -->
+  <nav aria-label="Class">
+    <ul class="tabs">
+      {% for o in class_tabs %}
+        <li data-class="{{ o.value }}">
+          <a href="{{ o.url }}" hx-get="{{ o.url }}" {% if o.active %}aria-current="page"{% endif %}>
+            {% if o.icon_item_id %}{{ m.sprite("items", o.icon_item_id, o.label, "icon-sm") }}{% endif %}
+            {{ o.label }} <span class="count">{{ o.count }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </nav>
+
+  <div class="win">
+    <div class="win-body">
+
+      <!-- ===== Filters (each row only appears when it applies) ===== -->
+      {{ m.filter_row("Type", type_options) }}
+      {{ m.filter_row("Section", use_options) }}
+      {{ m.filter_row("Gear", gear_options) }}
+      {{ m.filter_row("Slot", slot_options) }}
+      {{ m.filter_row("Weapon", weapon_options) }}
+      {{ m.filter_row("Level", level_options) }}
+
+      {#
+        Name filter. A normal GET form: hidden inputs keep the current filters.
+        hx-get on the form sends it through HTMX too (results only, URL updated).
+      #}
+      <div class="filter-row">
+        <label class="label" for="item-name-filter">Name</label>
+        <form class="name-filter" action="/items" method="get" hx-get="/items">
+          {% for key in ("class", "type", "slot", "weapon", "level") %}
+            {% if filters[key] and filters[key] != "all" %}<input type="hidden" name="{{ key }}" value="{{ filters[key] }}">{% endif %}
+          {% endfor %}
+          <input id="item-name-filter" type="search" name="q" value="{{ filters.q or '' }}" placeholder="e.g. glove">
+          <button type="submit" class="secondary">Filter</button>
+        </form>
+      </div>
+
+      <!-- ===== Results ===== -->
+      <div class="results-head">
+        <p><strong>{{ m.num(total) }}</strong> item{{ '' if total == 1 else 's' }}
+          {% if pages > 1 %}<span class="muted">(page {{ page }} of {{ pages }})</span>{% endif %}</p>
+        {% if filters.type or filters.level or filters.q or (filters["class"] and filters["class"] != "all") %}
+          <a href="{{ clear_url }}" hx-get="{{ clear_url }}">Clear filters</a>
+        {% endif %}
+      </div>
+
+      {% if items %}
+        <ul class="card-grid">
+          {% for it in items %}
+            <li>
+              {# Plain link (no hx-get): opening an item is a normal page load. #}
+              <a class="card" href="/items/{{ it.id }}">
+                {{ m.slot(it.id, it.name) }}
+                <span class="name">{{ it.name }}</span>
+                <span class="meta">
+                  {% if it.level_req %}Lv {{ it.level_req }}{% else %}No level req.{% endif %}
+                </span>
+                <span class="meta">
+                  {%- if it.weapon_type %}{{ it.weapon_type }}
+                  {%- elif it.equip_slot %}{{ it.equip_slot }}
+                  {%- elif it.sub_type %}{{ it.sub_type }}
+                  {%- else %}{{ (it.category or "") | capitalize }}{% endif -%}
+                  {%- if it.category == "equip" %}, {{ it.jobs | join("/") if it.jobs else "Any class" }}{% endif -%}
+                </span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+
+        {% if prev_url or next_url %}
+          <nav class="pager" aria-label="Pages">
+            {% if prev_url %}<a href="{{ prev_url }}" hx-get="{{ prev_url }}">Previous page</a>{% endif %}
+            <span class="muted">{{ page }} / {{ pages }}</span>
+            {% if next_url %}<a href="{{ next_url }}" hx-get="{{ next_url }}">Next page</a>{% endif %}
+          </nav>
+        {% endif %}
+      {% else %}
+        <div class="empty-state">
+          <p class="big">No items match these filters.</p>
+          <p class="muted">Try a wider level range or another type.</p>
+          <a class="button-link" href="{{ clear_url }}" hx-get="{{ clear_url }}">Clear filters</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>

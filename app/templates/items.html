@@ -1,0 +1,19 @@
+{#
+  items.html: the item browser (GET /items).
+  The whole browser (class tabs, filters, results) lives in partials/item_results.html.
+  When you click a tab or filter, HTMX asks the server for just that partial and swaps
+  it in, so the page doesn't fully reload. The address bar URL updates too, so any
+  filtered view can be bookmarked or shared.
+  Variables: see the top of partials/item_results.html.
+#}
+{% extends "base.html" %}
+{% block title %}Items{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Items</h1>
+  <p>Pick a class, then narrow it down by type, slot, weapon or level.</p>
+</div>
+
+{% include "partials/item_results.html" %}
+{% endblock %}

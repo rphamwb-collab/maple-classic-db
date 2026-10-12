@@ -1,0 +1,112 @@
+{#
+  home.html: the front page (GET /).
+  Variables (docs/api-contract.md):
+    q           always ""
+    counts      {items, monsters, shops}
+    class_tabs  [Option]  All, Beginner, Warrior, Magician, Bowman, Thief
+                Option = {label, value, count, icon_item_id, active, url}
+    classes     [{value, label, url, count, hat_id, hat, home, stat, blurb,
+                  gear: [{label, url, icon_item_id}]}]   the big class cards (equips only)
+    monster_field  {total, bands: [{label, url, monster: {id, name, level}}]}
+#}
+{% extends "base.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Items, drops, shops and prices{% endblock %}
+
+{# The home page has its own big search, so the header search is left out. #}
+{% block header_search %}{% endblock %}
+
+{% block content %}
+
+<!-- ===== Big search ===== -->
+<section class="home-hero">
+  <h1>Find any item, monster or shop in Maple World</h1>
+  {% with box_id="home-suggestions", placeholder="Try Red Potion, Snail, or Henesys" %}
+    {% include "partials/search_box.html" %}
+  {% endwith %}
+  {% if counts %}
+    <p class="counts">
+      <strong>{{ m.num(counts["items"]) }}</strong> items,
+      <strong>{{ m.num(counts.monsters) }}</strong> monsters and
+      <strong>{{ m.num(counts.shops) }}</strong> NPC shops so far.
+    </p>
+  {% endif %}
+</section>
+
+<!-- ===== Choose your class: the main way into the site =====
+     One big card per class: job instructor on a stage in the class colour,
+     hometown + main stat, and picture links straight to that class's gear. -->
+{% if classes %}
+<section class="class-showcase" aria-labelledby="by-class">
+  <div class="showcase-head">
+    <h2 id="by-class" class="title-text">Choose your class</h2>
+    <a href="/items">or browse all {{ m.num(counts["items"]) if counts else "" }} items</a>
+  </div>
+  <ul class="class-cards">
+    {% for c in classes %}
+      <li class="class-card" data-class="{{ c.value }}">
+        <a class="class-main" href="{{ c.url }}">
+          <span class="class-stage"><img src="/static/img/classes/{{ c.value }}.png" alt="" loading="lazy"
+                onerror="this.onerror=null;this.src='/static/img/placeholder.svg'"></span>
+          <span class="class-name">{{ c.label }}</span>
+          <span class="class-facts">{{ c.home }} <span aria-hidden="true">·</span> {{ c.stat }}</span>
+          <span class="class-blurb">{{ c.blurb }}</span>
+          <span class="class-cta">{{ m.num(c.count) }} items <span aria-hidden="true">→</span></span>
+        </a>
+        {% if c.gear %}
+          <ul class="class-gear" aria-label="{{ c.label }} gear">
+            {% for g in c.gear %}
+              <li><a href="{{ g.url }}" title="{{ g.label }}">{{ m.slot(g.icon_item_id, g.label) }}<span class="visually-hidden">{{ g.label }}</span></a></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<!-- ===== Hunt monsters: a little field where one monster per level band stands
+     on the grass, climbing from Snail upward. Each links to that level band. ===== -->
+{% if monster_field and monster_field.bands %}
+<section class="monster-field" aria-labelledby="hunt">
+  <div class="showcase-head">
+    <h2 id="hunt" class="title-text">Hunt monsters</h2>
+    <a href="/monsters">See all {{ monster_field.total }} monsters and their drops</a>
+  </div>
+  <div class="field">
+    <ul class="field-row">
+      {% for b in monster_field.bands %}
+        <li>
+          <a href="{{ b.url }}">
+            <span class="field-sprite">{{ m.art("monsters", b.monster.id, b.monster.name, alt="") }}</span>
+            <span class="field-name">{{ b.monster.name }}</span>
+            <span class="field-level">{{ b.label }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+<!-- ===== Shortcuts =====
+     Plain links into the browse pages. The item ids are just the pictures
+     (a sword, a potion, a scroll, a snail shell, a chair). -->
+<section class="win" aria-labelledby="shortcuts">
+  <h2 class="win-title" id="shortcuts">Jump in</h2>
+  <div class="win-body">
+    <ul class="shortcut-grid">
+      <li><a class="shortcut" href="/items?type=equip">{{ m.slot(1302000, "Equips") }}<span><strong>Equipment</strong><small>Weapons, clothes, accessories</small></span></a></li>
+      <li><a class="shortcut" href="/items?type=use">{{ m.slot(2000000, "Use items") }}<span><strong>Use items</strong><small>Potions and food</small></span></a></li>
+      <li><a class="shortcut" href="/items?type=use&amp;use=scroll">{{ m.slot(2040000, "Scrolls") }}<span><strong>Scrolls</strong><small>Upgrade your gear</small></span></a></li>
+      <li><a class="shortcut" href="/items?type=etc">{{ m.slot(4000000, "Etc items") }}<span><strong>Etc items</strong><small>Monster drops and materials</small></span></a></li>
+      <li><a class="shortcut" href="/items?type=setup">{{ m.slot(3010000, "Setup items") }}<span><strong>Setup items</strong><small>Chairs</small></span></a></li>
+      <li><a class="shortcut" href="/monsters"><span class="slot">{{ m.sprite("monsters", 1, "Monsters") }}</span><span><strong>Monsters by level</strong><small>Drops and drop rates</small></span></a></li>
+      <li><a class="shortcut" href="/shops"><span class="slot">{{ m.sprite("npcs", 9010000, "Shops") }}</span><span><strong>Shops by town</strong><small>What NPCs sell, and for how much</small></span></a></li>
+    </ul>
+  </div>
+  <p class="win-note">Most drop rates aren't in the game files, so many show as "Unknown rate".
+    Reporting your kills on a monster's page helps fill them in.</p>
+</section>
+{% endblock %}

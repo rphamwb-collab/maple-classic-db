@@ -1,0 +1,96 @@
+{#
+  base.html: the shared layout every page extends.
+  Child pages fill in these blocks:
+    {% block title %}         text for the browser tab
+    {% block header_search %} the small search bar in the header (home.html empties it,
+                              because the home page has its own big search)
+    {% block content %}       the main page body
+    {% block scripts %}       extra <script> tags (for example the price chart)
+  Libraries come from CDNs with exact versions pinned, so nothing needs building.
+  The look ("Maple World UI") is described in docs/design-plan.md and lives in static/css/site.css.
+#}
+{# Which top-nav link is the current section? Used for aria-current below. #}
+{%- set path = request.url.path if request else "/" -%}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}MapleStory Classic DB{% endblock %} | Maple Classic DB</title>
+  <meta name="description" content="MapleStory Classic item lookup, monster drops, NPC shops and a player-reported market price tracker.">
+  <meta name="color-scheme" content="light dark">
+
+  {# Fonts: Fredoka (headings), Nunito (body), DotGothic16 (pixel font, only in the item tooltip and prices). #}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@500;600&family=Nunito:wght@400;700&display=swap">
+
+  {# Pico.css: base styling for forms/buttons plus light and dark mode (follows the OS setting). #}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
+  {# Our game-window look on top of Pico. #}
+  <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
+
+  {# HTMX powers live search, the item filters and form submits without a page reload. #}
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+</head>
+<body>
+
+  <!-- ===== Header: logo, section links, search ===== -->
+  <header class="site-header">
+    <div class="container bar">
+      <a href="/" class="brand">
+        {# Our own simple leaf drawing (not the MapleStory logo). #}
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 3l2.6 5.6 4.6-1.9-1.6 5 5.2 1.4-4.1 3.4 1.8 3.9-5-.9L16 25l-3.5-5.5-5 .9 1.8-3.9-4.1-3.4 5.2-1.4-1.6-5 4.6 1.9z" fill="#E8771B" stroke="#8A5A2B" stroke-width="1.2" stroke-linejoin="round"/>
+          <rect x="15.1" y="23" width="1.8" height="7" rx=".9" fill="#8A5A2B"/>
+        </svg>
+        Maple Classic DB
+      </a>
+      <nav aria-label="Main">
+        <ul class="main-nav">
+          <li><a href="/items" {% if path.startswith('/items') %}aria-current="page"{% endif %}>Items</a></li>
+          <li><a href="/monsters" {% if path.startswith('/monsters') %}aria-current="page"{% endif %}>Monsters</a></li>
+          <li><a href="/shops" {% if path.startswith('/shops') or path.startswith('/npcs') %}aria-current="page"{% endif %}>Shops</a></li>
+        </ul>
+      </nav>
+      {% block header_search %}
+        {# Search box with live suggestions (see partials/search_box.html). #}
+        {% include "partials/search_box.html" %}
+      {% endblock %}
+    </div>
+  </header>
+
+  <!-- ===== Main page content ===== -->
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- ===== Footer: credits and disclaimers ===== -->
+  <footer class="site-footer">
+    <div class="container">
+      <p>Game data and images © Nexon. Fan project, not affiliated with Nexon.
+        Class characters rendered with <a href="https://maplestory.io/">maplestory.io</a>.</p>
+      <p>Market prices and observed drop rates are player-reported and may be inaccurate.</p>
+      {#
+        Per-source credits. Detail pages pass a `sources` list
+        (each with .name, .url and optionally .last_scraped). Other pages fall back
+        to the list of sources we use.
+      #}
+      <p>Data sources:
+        {% if sources %}
+          {% for s in sources %}
+            {% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.name }}</a>{% else %}{{ s.name }}{% endif %}{% if s.last_scraped %} (updated {{ s.last_scraped }}){% endif %}{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        {% else %}
+          OSMS client datamine,
+          <a href="https://maplestory.quest/" target="_blank" rel="noopener">MapleStory Quest</a>
+        {% endif %}
+      </p>
+      <p>Shop, item and monster data spot-checked against
+        <a href="https://meowdb.com/msclassic/" target="_blank" rel="noopener">NiaMeowDB</a>.</p>
+    </div>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

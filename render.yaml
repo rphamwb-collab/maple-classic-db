@@ -1,0 +1,18 @@
+# Render blueprint: render.com -> New -> Blueprint -> pick this repo.
+# Free plan: sleeps after 15 min idle, and data/maple.db is reset to the
+# committed copy on every deploy (player reports are not kept).
+services:
+  - type: web
+    name: maple-classic-db
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # --proxy-headers: Render sits in front of the app, so read each visitor's
+    # real address from X-Forwarded-For (the report rate limit needs it).
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.5
+      - key: ADMIN_PASSWORD
+        sync: false   # Render asks you to type it in; it is never stored in the repo

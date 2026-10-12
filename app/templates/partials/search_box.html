@@ -1,0 +1,44 @@
+{#
+  partials/search_box.html: a search bar with live suggestions.
+  Used in the header (base.html) and as the big search on the home page.
+
+  How it works:
+  - Typing sends GET /api/search?q=... (HTMX waits 250ms after you stop typing).
+  - The server sends back partials/search_suggestions.html, which HTMX drops into the
+    <ul> below the input.
+  - Pressing Enter submits the form normally and goes to the full results page /search?q=...
+
+  Optional variables (set them with {% with %} before including):
+    box_id       id for the suggestions list (must be unique on the page). Default "search-suggestions".
+    placeholder  hint text inside the box.
+  `q` is the current search text (the search page passes it back so the box stays filled).
+#}
+{%- set box_id = box_id or "search-suggestions" -%}
+<form class="search-box" action="/search" method="get" role="search">
+  <input
+    type="search"
+    name="q"
+    value="{{ q or '' }}"
+    placeholder="{{ placeholder or 'Search items, monsters, NPCs' }}"
+    aria-label="Search items, monsters and NPCs"
+    autocomplete="off"
+    hx-get="/api/search"
+    hx-trigger="input changed delay:250ms, search"
+    hx-target="#{{ box_id }}"
+    hx-swap="innerHTML"
+  >
+  <ul id="{{ box_id }}" class="suggestions" aria-live="polite"></ul>
+</form>
+<script>
+  // Close suggestion dropdowns when clicking outside a search box, or when pressing Escape.
+  // (Safe to run more than once: each listener just empties the lists.)
+  (function () {
+    function closeAll(except) {
+      document.querySelectorAll(".suggestions").forEach(function (box) {
+        if (!except || !except.contains(box)) box.innerHTML = "";
+      });
+    }
+    document.addEventListener("click", function (e) { closeAll(e.target.closest(".search-box")); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeAll(null); });
+  })();
+</script>

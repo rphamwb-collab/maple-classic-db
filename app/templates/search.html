@@ -1,0 +1,92 @@
+{#
+  search.html: the full search results page (GET /search?q=...).
+  Variables:
+    q        str  - what was searched
+    results  {items: [{id,name,category}], monsters: [{id,name,level}], npcs: [{id,name,town,map_name,location}]}
+    total    int  - total number of results
+#}
+{% extends "base.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Search{% if q %}: {{ q }}{% endif %}{% endblock %}
+
+{% block content %}
+{% if not q %}
+  <div class="page-head">
+    <h1>Search</h1>
+    <p>Type an item, monster or NPC name into the search bar above.</p>
+  </div>
+{% else %}
+  <div class="page-head">
+    <h1>Results for "{{ q }}"</h1>
+    <p>{{ total }} result{{ '' if total == 1 else 's' }}</p>
+  </div>
+
+  {% if total == 0 %}
+    <div class="empty-state">
+      <p class="big">Nothing matches "{{ q }}".</p>
+      <p class="muted">Try a shorter word, like "potion" instead of "red potions".</p>
+      <a class="button-link" href="/items">Browse all items</a>
+    </div>
+  {% endif %}
+
+  {# ----- Items ----- #}
+  {% if results["items"] %}
+  <section class="win" aria-labelledby="r-items">
+    <h2 class="win-title" id="r-items">Items <span class="count">{{ results["items"] | length }}</span></h2>
+    <div class="win-body">
+      <ul class="card-grid">
+        {% for it in results["items"] %}
+          <li>
+            <a class="card" href="/items/{{ it.id }}">
+              {{ m.slot(it.id, it.name) }}
+              <span class="name">{{ it.name }}</span>
+              {% if it.category %}<span class="meta">{{ it.category | capitalize }}</span>{% endif %}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
+  {# ----- Monsters ----- #}
+  {% if results.monsters %}
+  <section class="win" aria-labelledby="r-mobs">
+    <h2 class="win-title" id="r-mobs">Monsters <span class="count">{{ results.monsters | length }}</span></h2>
+    <div class="win-body">
+      <ul class="card-grid">
+        {% for mob in results.monsters %}
+          <li>
+            <a class="card" href="/monsters/{{ mob.id }}">
+              <span class="sprite-box">{{ m.art("monsters", mob.id, mob.name) }}</span>
+              <span class="name">{{ mob.name }}</span>
+              <span class="meta">Lv {{ mob.level if mob.level is not none else "?" }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
+  {# ----- NPCs ----- #}
+  {% if results.npcs %}
+  <section class="win" aria-labelledby="r-npcs">
+    <h2 class="win-title" id="r-npcs">NPCs <span class="count">{{ results.npcs | length }}</span></h2>
+    <div class="win-body">
+      <ul class="card-grid">
+        {% for npc in results.npcs %}
+          <li>
+            <a class="card" href="/npcs/{{ npc.id }}">
+              <span class="sprite-box">{{ m.art("npcs", npc.id, npc.name) }}</span>
+              <span class="name">{{ npc.name }}</span>
+              {% if npc.location or npc.town %}<span class="meta">{{ npc.location or npc.town }}</span>{% endif %}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# The built database IS committed (the free host can't run the 18-min scraper).
+# Rebuild it locally with `python -m scraper.run`, then commit data/maple.db.
+data/*.db
+!data/maple.db
+data/*.db-journal
+data/cache/
+.env
