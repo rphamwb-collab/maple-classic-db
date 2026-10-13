@@ -635,90 +635,72 @@ a.card:hover { border-color: var(--mw-orange); }
 
 /* --- Home --- */
 .home-hero {
-  /* desktop: search on the left, quick-jump window on the right */
+  /* desktop: search on the left, the title-screen scene on the right */
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(24rem, 31rem);
   gap: 1.5rem 2rem;
   align-items: center;
   padding: 1.5rem 0 1rem;
 }
-.quick-jump { margin: 0; }
-.quick-jump .qj-label {
-  margin: 0 0 0.35rem;
-  font-family: var(--mw-display);
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--mw-muted);
+/* Title-screen scene beside the search (desktop/tablet): the five classes on a
+   grassy ledge in front of Henesys, with a Slime bouncing at the end of the row. */
+.hero-scene {
+  position: relative;
+  height: 18rem;
+  border: 3px solid var(--mw-wood);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--mw-shadow);
+  background:
+    linear-gradient(to bottom, transparent calc(100% - 2.6rem), var(--mw-grass) calc(100% - 2.6rem),
+      var(--mw-grass) calc(100% - 2rem), #A0703F calc(100% - 2rem)),
+    url("/static/img/towns/bowman.webp") center bottom / cover no-repeat;
 }
-/* The window lets the Slime poke out above it, so the title strip rounds its own corners. */
-.quick-jump { position: relative; overflow: visible; margin-top: 2.6rem; }
-.quick-jump .win-title { border-radius: 11px 11px 0 0; }
-.qj-slime {
-  /* the Slime (monsters/7.webp, animated) sitting on the window's top edge */
+.scene-row {
   position: absolute;
-  right: 1.25rem;
-  bottom: calc(100% - 4px);
-  height: 52px;
-  width: auto;
-  image-rendering: pixelated;
-  pointer-events: none;
-}
-.qj-tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(5.4rem, 1fr));
-  gap: 0.45rem;
-  margin: 0 0 0.85rem;
-  padding: 0;
+  left: 0;
+  right: 0;
+  bottom: 2.45rem;            /* feet on the grass */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0 0.75rem;
   list-style: none;
 }
-.qj-tiles:last-child { margin-bottom: 0; }
-@media (min-width: 861px) {
-  /* desktop: each group is one row of tiles, so the card is about as tall as the search */
-  .qj-tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.35rem; }
-  .qj-tile { padding: 0.35rem 0.15rem 0.4rem; }
-  .qj-pic { width: 2.7rem; height: 2.7rem; }
-  .qj-pic img { max-width: 2.45rem; max-height: 2.45rem; }
-  .qj-name { font-size: 0.72rem; }
+.scene-row li { list-style: none; margin: 0; padding: 0; }
+.scene-row a { display: block; transition: transform 0.15s ease; }
+.scene-row a:hover, .scene-row a:focus-visible { transform: translateY(-5px); }
+.scene-row a img {
+  display: block;
+  height: 6.3rem;
+  width: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.25));
 }
-.qj-tiles li { list-style: none; margin: 0; padding: 0; }
-.qj-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  height: 100%;
-  padding: 0.4rem 0.3rem 0.45rem;
-  border: 2px solid var(--mw-wood-soft);
-  border-radius: 12px;
-  background: var(--mw-paper);
-  color: var(--mw-ink);
-  text-decoration: none;
-  text-align: center;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+.scene-slime {
+  display: block;
+  height: 3.1rem;
+  width: auto;
+  image-rendering: pixelated;
+  animation: scene-bounce 1.4s ease-in-out infinite;
 }
-.qj-tile:hover, .qj-tile:focus-visible { border-color: var(--mw-orange); color: var(--mw-ink); transform: translateY(-2px); }
-.qj-pic {
-  /* picture box: game sprites sit in an inventory-style slot */
-  display: grid;
-  place-items: center;
-  width: 3.2rem;
-  height: 3.2rem;
-  border-radius: 10px;
-  background: var(--mw-paper-2);
-  overflow: hidden;
+@keyframes scene-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
-.qj-pic img { max-width: 2.9rem; max-height: 2.9rem; width: auto; height: auto; image-rendering: pixelated; }
-.qj-pic.qj-scene img {
-  /* town / world map pictures: fill the box, smooth (they're painted art) */
-  width: 100%; height: 100%; max-width: none; max-height: none;
-  object-fit: cover; image-rendering: auto;
-}
-.qj-name { font-size: 0.8rem; font-weight: 600; line-height: 1.15; }
 @media (prefers-reduced-motion: reduce) {
-  .qj-tile, .qj-tile:hover { transition: none; transform: none; }
+  .scene-slime { animation: none; }
+  .scene-row a, .scene-row a:hover { transition: none; transform: none; }
+}
+@media (max-width: 1100px) {
+  .scene-row { gap: 0.35rem; }
+  .scene-row a img { height: 5.2rem; }
+  .scene-slime { height: 2.6rem; }
 }
 @media (max-width: 860px) {
-  .home-hero { grid-template-columns: minmax(0, 1fr); }   /* phones/tablets: quick jump goes under the search */
+  .home-hero { grid-template-columns: minmax(0, 1fr); }   /* tablets: the scene goes under the search */
 }
 .home-hero h1 { font-size: 2.44rem; margin-bottom: 0.75rem; }
 .home-hero .search-box input[type="search"] {
@@ -1778,13 +1760,9 @@ p.notice {
   .class-blurb { font-size: 0.75rem; }
   .class-gear { gap: 0.2rem; padding: 0.45rem 0.3rem 0.55rem; }
   .class-gear .slot { width: 2rem; height: 2rem; }
-  /* quick jump: a little tighter */
-  .quick-jump { margin-top: 2.2rem; }
-  .qj-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .qj-slime { height: 44px; }
 }
 
-/* --- Home on phones: "Hunt monsters" replaces the Quick jump under the search,
+/* --- Home on phones: "Hunt monsters" takes the scene's place under the search,
        with the Slime sitting on top of the field. Desktop is unchanged. --- */
 .field-wrap { position: relative; }
 .field-slime { display: none; }
@@ -1793,7 +1771,7 @@ p.notice {
   .home-page > * { order: 2; }
   .home-page > .home-hero { order: 0; }
   .home-page > .monster-field { order: 1; }
-  .quick-jump { display: none; }
+  .hero-scene { display: none; }   /* phones show Hunt monsters here instead */
   .field-slime {
     display: block;
     position: absolute;

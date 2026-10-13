@@ -170,3 +170,10 @@ def test_css_link_is_versioned_by_content(client):
 
 def test_versioned_static_url_still_serves_the_file(client):
     assert client.get("/static/css/site.css?v=anything").status_code == 200
+
+
+def test_home_has_class_scene_linking_each_class(client):
+    r = client.get("/")
+    assert 'class="hero-scene"' in r.text
+    for cls in ("beginner", "warrior", "magician", "bowman", "thief"):
+        assert f'href="/items?class={cls}"' in r.text
