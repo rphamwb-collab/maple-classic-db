@@ -354,3 +354,33 @@ def test_item_page_has_new_fields(client):
     for key in ("how_to_get", "used_in", "sellable"):
         assert key in r.context
     assert {"equip_slot", "weapon_type", "jobs"} <= set(r.context["item"])
+
+
+# ---------- hometown backgrounds ----------
+
+TOWN_CLASSES = ("all", "beginner", "warrior", "magician", "bowman", "thief")
+
+
+def test_every_class_has_a_town_picture():
+    from pathlib import Path
+    towns = Path(__file__).resolve().parents[1] / "app" / "static" / "img" / "towns"
+    for cls in TOWN_CLASSES:
+        assert (towns / f"{cls}.webp").is_file(), f"missing town picture for {cls}"
+
+
+def test_items_banner_shows_the_class_hometown(client):
+    r = client.get("/items?class=bowman")
+    assert r.status_code == 200
+    assert 'class="town-banner" data-class="bowman"' in r.text
+    assert "Henesys" in r.text
+
+
+def test_items_banner_defaults_to_lith_harbor(client):
+    r = client.get("/items", headers=HTMX)
+    assert 'data-class="all"' in r.text and "Lith Harbor" in r.text
+
+
+def test_town_pictures_are_served(client):
+    for cls in TOWN_CLASSES:
+        r = client.get(f"/static/img/towns/{cls}.webp")
+        assert r.status_code == 200

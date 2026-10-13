@@ -1,0 +1,208 @@
+{#
+  audit.html: the "Data quality" page (GET /audit?check=<slug>).
+  Design: docs/design-audit.md ("Quest Log" idea). Variables (docs/api-contract.md, v2.5):
+    active    str   selected check slug, or "" for the overview (all checks)
+    checks    [{slug, label, description, count, url, active}]   summary cards + tabs
+    all_url   "/audit"
+    sections  [{slug, label, description, count, rows, shown, more_url}]
+    last_run  "YYYY-MM-DD" or None   (date of the latest data refresh)
+  Every row shape depends on the check, so each section picks its columns by `section.slug`.
+  No HTMX here: the tabs and cards are plain links.
+#}
+{% extends "base.html" %}
+{% import "partials/macros.html" as m %}
+{% block title %}Data quality{% endblock %}
+
+{# --- Small helpers just for this page --- #}
+
+{# Item name with its icon, linked to the item page. #}
+{% macro item_cell(item) -%}
+  <span class="audit-thing">
+    <span class="slot slot-sm">{{ m.sprite("items", item.id, item.name) }}</span>
+    <a href="/items/{{ item.id }}">{{ item.name }}</a>
+  </span>
+{%- endmacro %}
+
+{# Monster name with its picture, linked to the monster page. #}
+{% macro monster_cell(mon) -%}
+  <span class="audit-thing">
+    <span class="slot slot-sm">{{ m.sprite("monsters", mon.id, mon.name) }}</span>
+    <a href="/monsters/{{ mon.id }}">{{ mon.name }}</a>
+  </span>
+{%- endmacro %}
+
+{# A little symbol for each check, shown in the card's slot (decorative). #}
+{% set ICONS = {
+  "no-source": "?", "mobs-no-drops": "0", "unknown-rates": "%",
+  "source-mismatch": "≠", "player-confirmed": "✓", "rate-mismatch": "×3",
+  "reported-not-listed": "+"
+} %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Data quality</h1>
+  <p>Automatic checks on our game data, plus what players have reported.
+    {% if last_run %}<span class="muted">Last data refresh: {{ last_run }}.</span>{% endif %}</p>
+</div>
+
+{# ===== Summary cards: one per check, each links to that check ===== #}
+<ul class="audit-cards" aria-label="Checks">
+  {% for c in checks %}
+    <li>
+      <a class="audit-card{% if c.count == 0 %} is-clear{% endif %}" href="{{ c.url }}"
+         {% if c.active %}aria-current="page"{% endif %}>
+        <span class="slot audit-icon" aria-hidden="true">{{ ICONS.get(c.slug, "•") }}</span>
+        <span class="audit-card-text">
+          <span class="audit-card-label">{{ c.label }}</span>
+          {% if c.count == 0 %}
+            <span class="audit-card-count clear">All clear</span>
+          {% else %}
+            <span class="audit-card-count">{{ "{:,}".format(c.count) }}</span>
+          {% endif %}
+        </span>
+      </a>
+    </li>
+  {% endfor %}
+</ul>
+
+{# ===== Filter tabs (inventory-tab style, same as the item browser) ===== #}
+<ul class="tabs" aria-label="Filter checks">
+  <li><a href="{{ all_url }}" {% if not active %}aria-current="page"{% endif %}>All checks</a></li>
+  {% for c in checks %}
+    <li><a href="{{ c.url }}" {% if c.active %}aria-current="page"{% endif %}>{{ c.label }} <span class="count">{{ c.count }}</span></a></li>
+  {% endfor %}
+</ul>
+
+{# ===== One window per check ===== #}
+{% for s in sections %}
+<section class="win audit-section" id="{{ s.slug }}" aria-labelledby="title-{{ s.slug }}">
+  <h2 class="win-title" id="title-{{ s.slug }}">{{ s.label }} <span class="count">{{ "{:,}".format(s.count) }}</span></h2>
+  <div class="win-body">
+    <p class="audit-desc">{{ s.description }}</p>
+
+    {% if not s.rows %}
+      {# --- Empty state: says what it means and, for player checks, what to do --- #}
+      <div class="empty-state">
+        {% if s.slug in ("player-confirmed", "rate-mismatch", "reported-not-listed") %}
+          <p class="big">No player reports to compare yet.</p>
+          <p class="muted">Report your kills and drops on any monster's page to help check our rates.</p>
+          <a class="button-link" href="/monsters">Find a monster to report drops</a>
+        {% elif s.slug == "source-mismatch" %}
+          <p class="big">All clear. The sources agree.</p>
+          <p class="muted">If no data refresh has run yet, there is nothing to compare.</p>
+        {% else %}
+          <p class="big">All clear. Nothing to look at here.</p>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="table-wrap">
+        <table class="audit-table">
+
+          {# --- Columns depend on the check --- #}
+          {% if s.slug == "no-source" %}
+            <thead><tr><th>Item</th><th class="hide-sm">Type</th></tr></thead>
+            <tbody>
+            {% for r in s.rows %}
+              <tr><td>{{ item_cell(r.item) }}</td><td class="hide-sm">{{ m.val(r.item.category) }}</td></tr>
+            {% endfor %}
+            </tbody>
+
+          {% elif s.slug == "mobs-no-drops" %}
+            <thead><tr><th>Monster</th><th class="num">Level</th></tr></thead>
+            <tbody>
+            {% for r in s.rows %}
+              <tr><td>{{ monster_cell(r.monster) }}</td><td class="num">{{ m.val(r.monster.level) }}</td></tr>
+            {% endfor %}
+            </tbody>
+
+          {% elif s.slug == "unknown-rates" %}
+            <thead><tr><th>Item</th><th>Monster</th><th>Rate</th></tr></thead>
+            <tbody>
+            {% for r in s.rows %}
+              <tr>
+                <td>{{ item_cell(r.item) }}</td>
+                <td>{{ monster_cell(r.monster) }}</td>
+                {# Same pill as the item/monster pages (dashed "Unknown rate", or rate + "Older-version estimate"). #}
+                <td>{{ m.rate_pill(r) }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+
+          {% elif s.slug == "source-mismatch" %}
+            {# item_id may not exist in our items table, so show a plain ID when there's no item. #}
+            <thead><tr><th>Kind</th><th>What differs</th><th>About</th></tr></thead>
+            <tbody>
+            {% for r in s.rows %}
+              <tr>
+                <td><span class="pill pill-tag">{{ r.kind_label }}</span></td>
+                <td>{{ r.detail }}
+                  {% if r.source_url %}<a class="ext" href="{{ r.source_url }}" target="_blank" rel="noopener">MapleStory Quest page ↗</a>{% endif %}
+                </td>
+                <td>
+                  {% if r.item %}{{ item_cell(r.item) }}
+                  {% elif r.item_id %}<span class="muted">Item ID {{ r.item_id }}</span>{% endif %}
+                  {% if r.monster %}{{ monster_cell(r.monster) }}{% endif %}
+                  {% if r.npc %}<a href="/npcs/{{ r.npc.id }}">{{ r.npc.name }}</a>{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+
+          {% elif s.slug == "player-confirmed" %}
+            <thead><tr><th>Item</th><th>Monster</th><th>Players saw</th></tr></thead>
+            <tbody>
+            {% for r in s.rows %}
+              <tr>
+                <td>{{ item_cell(r.item) }}</td>
+                <td>{{ monster_cell(r.monster) }}</td>
+                <td>
+                  <span class="pill pill-confirmed">Player-confirmed</span>
+                  <span class="sub">{{ r.observed.drops_seen }} drop{{ '' if r.observed.drops_seen == 1 else 's' }} in {{ "{:,}".format(r.observed.kills) }} kills</span>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+
+          {% elif s.slug == "rate-mismatch" %}
+            <thead><tr><th>Item</th><th>Monster</th><th>Our rate</th><th>Players see</th></tr></thead>
+            <tbody>
+            {% for r in s.rows %}
+              <tr>
+                <td>{{ item_cell(r.item) }}</td>
+                <td>{{ monster_cell(r.monster) }}</td>
+                <td>{{ m.rate_pill(r) }}</td>
+                <td>
+                  {{ m.observed_pill(r.observed) }}
+                  <span class="sub">{{ "{:,}".format(r.observed.kills) }} kills, {{ r.direction }} than ours</span>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+
+          {% elif s.slug == "reported-not-listed" %}
+            <thead><tr><th>Item</th><th>Monster</th><th>Players saw</th></tr></thead>
+            <tbody>
+            {% for r in s.rows %}
+              <tr>
+                <td>{{ item_cell(r.item) }}</td>
+                <td>{{ monster_cell(r.monster) }}</td>
+                <td>{{ r.observed.drops_seen }} drop{{ '' if r.observed.drops_seen == 1 else 's' }} in {{ "{:,}".format(r.observed.kills) }} kills</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          {% endif %}
+
+        </table>
+      </div>
+    {% endif %}
+  </div>
+
+  {# On the overview, only the first rows show; link to the full list. #}
+  {% if s.more_url %}
+    <p class="win-note">Showing {{ s.shown }} of {{ "{:,}".format(s.count) }}. <a href="{{ s.more_url }}">Show all {{ s.label | lower }}</a></p>
+  {% elif active and s.count > s.shown %}
+    <p class="win-note">Showing the first {{ s.shown }} of {{ "{:,}".format(s.count) }}.</p>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

@@ -1,7 +1,8 @@
 {#
   npc.html: one NPC's page (GET /npcs/{npc_id}).
   Variables (docs/api-contract.md):
-    npc      {id, name, town, map_name, location, note}   location is ready-made, e.g. "Henesys Market, Henesys"
+    npc      {id, name, town, map_name, location, note, map_id, world}   location is ready-made, e.g. "Henesys Market, Henesys"
+             world = island slug or None (None = no "Show on map" button)
              note = str or None, e.g. "Not open in this release"
     shop     [{item: {id, name, category}, buy_price}]   sorted by item name
     sources  [{name, url, last_scraped}]
@@ -18,7 +19,8 @@
   <div class="stage">{{ m.art("npcs", npc.id, npc.name, alt=npc.name) }}</div>
   <div>
     <h1>{{ npc.name }}</h1>
-    <p class="muted">{{ npc.location or npc.town or "Location unknown" }}</p>
+    <p class="muted">{{ npc.location or npc.town or "Location unknown" }}
+      {% if npc.world %}{{ m.ping_button("npc=" ~ npc.id, npc.name) }}{% endif %}</p>
     {{ m.notice(npc.note) }}
     {% if shop %}<p><span class="pill pill-tag">Sells {{ shop | length }} item{{ '' if shop | length == 1 else 's' }}</span></p>{% endif %}
   </div>

@@ -5,6 +5,8 @@
              hidden = True for test/unreleased mobs; note = str or None
     drops    [{item: {id, name, category}, rate_percent, rate_label, rate_source, confidence, observed}]
              observed = {kills, drops_seen, rate_percent, low_confidence, label}
+    found_in [{map_id, name, world, x, y, exact}]   world = None when we have no map spot
+    has_pings  bool: at least one found_in row has a world ("Show all on map" button)
     worlds   list of world names for the drop form
     sources  [{name, url, last_scraped}]
 #}
@@ -27,7 +29,16 @@
       <li><span class="k">HP</span><span class="v">{{ m.num(monster.hp) }}</span></li>
       <li><span class="k">EXP</span><span class="v">{{ m.num(monster.exp) }}</span></li>
     </ul>
-    {% if monster.maps %}
+    {# found_in rows have a world when we know where the map is: those get a pin button. #}
+    {% if found_in %}
+      <p class="muted" style="margin-bottom:.35rem">Found in</p>
+      <ul class="map-list">
+        {% for map in found_in %}
+          <li class="pill pill-tag">{{ map.name }}{% if map.world %} {{ m.ping_button("map=" ~ map.map_id, map.name, text="") }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% if has_pings %}<p class="map-list-actions">{{ m.ping_button("monster=" ~ monster.id, monster.name, text="Show all on map") }}</p>{% endif %}
+    {% elif monster.maps %}
       <p class="muted" style="margin-bottom:.35rem">Found in</p>
       <ul class="map-list">
         {% for map in monster.maps %}<li class="pill pill-tag">{{ map }}</li>{% endfor %}
@@ -51,6 +62,7 @@
               <a class="name" href="/items/{{ d.item.id }}">{{ d.item.name }}</a>
               <span class="rates">
                 {{ m.rate_pill(d) }}
+                {{ m.confirmed_pill(d) }}
                 {{ m.observed_pill(d.observed) }}
               </span>
             </div>

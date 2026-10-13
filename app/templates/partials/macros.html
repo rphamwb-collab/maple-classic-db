@@ -141,6 +141,16 @@
   {%- endif -%}
 {%- endmacro %}
 
+{#
+  "Player-confirmed" pill: an older-version (estimated) drop that players have
+  actually seen drop in Classic. d.player_confirmed comes from the backend.
+#}
+{% macro confirmed_pill(d) -%}
+  {%- if d.player_confirmed -%}
+    <span class="pill pill-confirmed" title="Players reported seeing this drop, so it does exist in Classic.">Player-confirmed</span>
+  {%- endif -%}
+{%- endmacro %}
+
 {# The small credit line at the bottom of each detail page. #}
 {% macro source_credits(sources) -%}
   {%- if sources -%}
@@ -152,4 +162,17 @@
     {%- endfor %}.
   </p>
   {%- endif -%}
+{%- endmacro %}
+
+{#
+  "Show on map" button (docs/design-worldmap.md).
+    query: what to locate, e.g. "monster=100100", "npc=9010000" or "map=10000"
+    label: the name shown in the popup title ("Snail on the map")
+    text:  button text; "" makes a pin-only button (the label goes to screen readers)
+  With JavaScript (static/js/worldmap.js) it opens the shared map popup.
+  Without JavaScript it's a plain link to the /api/locate answer.
+#}
+{% macro ping_button(query, label, text="Show on map") -%}
+  <a class="ping-btn" role="button" href="/api/locate?{{ query }}" data-locate="{{ query }}" data-label="{{ label }}"
+     {% if not text %}aria-label="Show {{ label }} on the map" title="Show on map"{% endif %}><span aria-hidden="true">📍</span>{% if text %} {{ text }}{% endif %}</a>
 {%- endmacro %}

@@ -82,6 +82,7 @@ class Monster(Base):
     source: Mapped[Source] = relationship()
     drops: Mapped[list["Drop"]] = relationship(back_populates="monster")
     drop_reports: Mapped[list["DropReport"]] = relationship(back_populates="monster")
+    monster_maps: Mapped[list["MonsterMap"]] = relationship(back_populates="monster")  # where it spawns
 
 
 class Drop(Base):
@@ -118,6 +119,7 @@ class Npc(Base):
 
     source: Mapped[Source] = relationship()
     shop_items: Mapped[list["ShopItem"]] = relationship(back_populates="npc")
+    npc_maps: Mapped[list["NpcMap"]] = relationship(back_populates="npc")  # where it stands
 
 
 class ShopItem(Base):
@@ -226,3 +228,84 @@ class QuestReward(Base):
 
     item: Mapped[Item] = relationship(back_populates="quest_rewards")
     source: Mapped[Source] = relationship()
+
+
+class AuditFinding(Base):
+    """One disagreement between OSMS and MapleStory Quest, found during `scraper.run`.
+
+    Rebuilt (emptied and refilled) on every run. `check` says what kind:
+    - "name_mismatch":     same item ID, different item name
+    - "unknown_item_ref":  an MSQ drop/shop row points at an item ID OSMS doesn't have
+    - "npc_shop_rejected": an MSQ NPC page is about a different NPC, so we ignored its shop
+    """
+
+    __tablename__ = "audit_findings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    check: Mapped[str] = mapped_column(String(40), index=True)
+    # Plain number, NOT a foreign key: for "unknown_item_ref" the item isn't in our items table.
+    item_id: Mapped[Optional[int]] = mapped_column(index=True)
+    monster_id: Mapped[Optional[int]] = mapped_column(ForeignKey("monsters.id"), index=True)
+    npc_id: Mapped[Optional[int]] = mapped_column(ForeignKey("npcs.id"), index=True)
+    detail: Mapped[str]  # plain-English sentence, ready to show on the page
+    source_a: Mapped[str] = mapped_column(String(100), default="OSMS Data Explorer")
+    source_b: Mapped[str] = mapped_column(String(100), default="MapleStory Quest")
+    found_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class Map(Base):
+    """A Classic game map (e.g. Henesys). `id` is the Classic map ID (differs from v83 IDs).
+
+    world + spot_x/spot_y say where the map sits on the world map picture, in pixels from
+    the picture's top-left corner. spot_exact=False means the map has no spot of its own,
+    so we use the spot of the town it returns to (return_map_id).
+    """
+
+    __tablename__ = "maps"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    name: Mapped[str] = mapped_column(String(200), index=True)
+    street_name: Mapped[Optional[str]] = mapped_column(String(200))
+    region: Mapped[Optional[str]] = mapped_column(String(100))  # OSMS region, e.g. "Victoria Island"
+    map_mark: Mapped[Optional[str]] = mapped_column(String(50))  # e.g. "Henesys", "Dungeon"
+    is_town: Mapped[bool] = mapped_column(default=False)
+    return_map_id: Mapped[Optional[int]]  # plain number, NOT a foreign key
+    world: Mapped[Optional[str]] = mapped_column(String(30), index=True)  # maple-island / victoria-island / None
+    spot_x: Mapped[Optional[int]]
+    spot_y: Mapped[Optional[int]]
+    spot_exact: Mapped[Optional[bool]]  # True = own spot, False = town's spot, None = no spot
+    v83_map_id: Mapped[Optional[int]]  # matching v83 map (debugging only)
+    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id"))
+
+    source: Mapped[Source] = relationship()
+    monster_maps: Mapped[list["MonsterMap"]] = relationship(back_populates="map")
+    npc_maps: Mapped[list["NpcMap"]] = relationship(back_populates="map")
+
+
+class MonsterMap(Base):
+    """A monster spawns on a map. spawn_count = how many spawn there (None if unknown)."""
+
+    __tablename__ = "monster_maps"
+    __table_args__ = (UniqueConstraint("monster_id", "map_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    monster_id: Mapped[int] = mapped_column(ForeignKey("monsters.id"), index=True)
+    map_id: Mapped[int] = mapped_column(ForeignKey("maps.id"), index=True)
+    spawn_count: Mapped[Optional[int]]
+
+    monster: Mapped[Monster] = relationship(back_populates="monster_maps")
+    map: Mapped[Map] = relationship(back_populates="monster_maps")
+
+
+class NpcMap(Base):
+    """An NPC stands on a map."""
+
+    __tablename__ = "npc_maps"
+    __table_args__ = (UniqueConstraint("npc_id", "map_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    npc_id: Mapped[int] = mapped_column(ForeignKey("npcs.id"), index=True)
+    map_id: Mapped[int] = mapped_column(ForeignKey("maps.id"), index=True)
+
+    npc: Mapped[Npc] = relationship(back_populates="npc_maps")
+    map: Mapped[Map] = relationship(back_populates="npc_maps")

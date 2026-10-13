@@ -1,0 +1,35 @@
+{
+  "maple-island": {
+    "title": "Maple Island",
+    "image": "/static/img/worldmap/maple-island.png",
+    "width": 640,
+    "height": 452,
+    "origin": {
+      "x": 320,
+      "y": 226,
+      "isEmpty": false
+    }
+  },
+  "victoria-island": {
+    "title": "Victoria Island",
+    "image": "/static/img/worldmap/victoria-island.png",
+    "width": 640,
+    "height": 470,
+    "origin": {
+      "x": 320,
+      "y": 235,
+      "isEmpty": false
+    }
+  },
+  "world": {
+    "title": "Maple World",
+    "image": "/static/img/worldmap/world.png",
+    "width": 640,
+    "height": 470,
+    "origin": {
+      "x": 320,
+      "y": 235,
+      "isEmpty": false
+    }
+  }
+}

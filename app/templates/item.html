@@ -11,6 +11,8 @@
     how_to_get  {shops, drops, recipes, quests}
                  shops   [{npc: NpcRef, buy_price}]
                  drops   [{monster: {id,name,level}, rate_percent, rate_label, rate_source, confidence, observed}]
+                         each drop also has has_pings (bool: "Map" button shows all the monster's spots)
+                 NpcRef has map_id and world (world None = no "Map" button)
                  recipes [{discipline, discipline_level, req_level, meso_cost, result_count, ingredients}]
                  quests  [{quest_name, npc_name, level_min, count, region, reward_type, job}]
     used_in     [{result: ItemRef, result_count, count, discipline, discipline_level, req_level, meso_cost, ingredients}]
@@ -158,6 +160,7 @@
                   <span class="main">
                     <a href="/npcs/{{ s.npc.id }}">{{ s.npc.name }}</a>
                     <span class="sub">{{ s.npc.location or s.npc.town or "Location unknown" }}</span>
+                    {% if s.npc.world %}{{ m.ping_button("npc=" ~ s.npc.id, s.npc.name, text="Map") }}{% endif %}
                   </span>
                   <span class="end">{{ m.mesos(s.buy_price) }}</span>
                 </li>
@@ -177,9 +180,11 @@
                   <span class="main">
                     <a href="/monsters/{{ d.monster.id }}">{{ d.monster.name }}</a>
                     <span class="sub">{% if d.monster.level %}Lv {{ d.monster.level }}{% else %}Level unknown{% endif %}</span>
+                    {# Pings every spot where this monster lives. #}
+                    {% if d.has_pings %}{{ m.ping_button("monster=" ~ d.monster.id, d.monster.name, text="Map") }}{% endif %}
                   </span>
                   <span class="end">
-                    {{ m.rate_pill(d) }}
+                    {{ m.rate_pill(d) }} {{ m.confirmed_pill(d) }}
                     <span class="sub">{{ m.observed_pill(d.observed) }}</span>
                   </span>
                 </li>
@@ -292,6 +297,15 @@
         <a class="button-link" href="#price-input">Report a price</a>
       </div>
     {% endif %}
+
+    {#
+      External link to MesoWatch (a community Windia price tracker).
+      Link only: we never pull data from that site. Opens in a new tab.
+    #}
+    <p class="external-note">
+      <a href="https://meso.watch/" target="_blank" rel="noopener">See live Windia prices on MesoWatch ↗</a>
+      <span class="muted">MesoWatch is a community site, not affiliated with us.</span>
+    </p>
 
     {#
       Report a price form.

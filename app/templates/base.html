@@ -69,8 +69,10 @@
   <footer class="site-footer">
     <div class="container">
       <p>Game data and images © Nexon. Fan project, not affiliated with Nexon.
-        Class characters rendered with <a href="https://maplestory.io/">maplestory.io</a>.</p>
-      <p>Market prices and observed drop rates are player-reported and may be inaccurate.</p>
+        Class characters and town backgrounds rendered with <a href="https://maplestory.io/">maplestory.io</a>.
+        World map from the v83 game files via <a href="https://maplestory.io/">maplestory.io</a>.</p>
+      <p>Market prices and observed drop rates are player-reported and may be inaccurate.
+        <a href="/audit">Data quality: see what we're unsure about</a>.</p>
       {#
         Per-source credits. Detail pages pass a `sources` list
         (each with .name, .url and optionally .last_scraped). Other pages fall back
@@ -88,8 +90,33 @@
       </p>
       <p>Shop, item and monster data spot-checked against
         <a href="https://meowdb.com/msclassic/" target="_blank" rel="noopener">NiaMeowDB</a>.</p>
+      {# MesoWatch: external link only, no data is taken from it. #}
+      <p>Live Windia prices:
+        <a href="https://meso.watch/" target="_blank" rel="noopener">MesoWatch ↗</a>
+        (community site, not affiliated with us).</p>
     </div>
   </footer>
+
+  {# ===== Shared "Show on map" popup =====
+       One <dialog> for the whole site. static/js/worldmap.js fills it when any
+       button with data-locate="monster=ID" (or npc=ID / map=ID) is clicked:
+       the island picture, pulsing pings, and the map names in words. #}
+  <dialog id="map-dialog" class="wm-dialog" aria-labelledby="map-dialog-title-text">
+    <div class="win">
+      <h2 class="win-title" id="map-dialog-title"><span id="map-dialog-title-text">On the map</span>
+        <button type="button" class="wm-close" aria-label="Close map">&times;</button></h2>
+      <div class="win-body">
+        <div class="tabs wm-tabs" role="tablist" aria-label="Islands" hidden></div>
+        <div class="wm-dialog-map"></div>
+        <p class="wm-status" aria-live="polite"></p>
+        <ul class="wm-ping-list"></ul>
+        <p class="wm-unplaced" hidden></p>
+      </div>
+    </div>
+  </dialog>
+
+  {# World map + "Show on map" buttons (plain JS, no framework). #}
+  <script src="{{ url_for('static', path='js/worldmap.js') }}" defer></script>
 
   {% block scripts %}{% endblock %}
 </body>

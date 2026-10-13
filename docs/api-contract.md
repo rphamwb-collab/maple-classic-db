@@ -192,3 +192,106 @@ List of days (oldest first, only days that have reports, last 30 days). Outliers
 - **Hidden monsters:** `Monster.hidden = True` mobs are left out of `/monsters`, search + `/api/search`, home `monster_field`, `counts.monsters` and item-page "Dropped by". `/monsters/{id}` still loads and shows a "Test/unreleased monster" notice (`monster.hidden`).
 - **Notes:** `monster.note` and `NpcRef.note` (str or None) show as a small notice (`m.notice`) on monster/NPC pages; `/shops` cards show the NPC note as a pill.
 - All of this reads the new columns with `getattr`, so pages work before and after data-engineer adds them.
+
+## v2.5: Data audit (backend-dev, 2026-10-12)
+
+### Service: `app/services/audit.py`
+Each check is one pure query function. All of them take `(db, limit=None)` and return **`(rows, count)`**:
+`count` is the total number of problems (int), and `rows` is a list of plain dicts, cut to the first `limit` rows when `limit` is given (`None` = all rows).
+
+| slug | function | what it finds | row shape |
+|---|---|---|---|
+| `no-source` | `no_source_items(db, limit=None)` | items with no drop (from a visible monster), shop, recipe or quest reward | `{item: ItemRef}` sorted by name |
+| `mobs-no-drops` | `mobs_without_drops(db, limit=None)` | visible (not hidden) monsters with zero drop rows | `{monster: MonsterRef}` sorted by level, name |
+| `unknown-rates` | `unknown_rates(db, limit=None)` | drops (visible monsters) where `drop_rate` is None or `confidence == "estimated"` | DropRow + `reason` (`"Unknown rate"` or `"Older-version estimate"`) |
+| `source-mismatch` | `source_mismatches(db, limit=None)` | rows of the `audit_findings` table (OSMS vs MapleStory Quest disagreements, filled by `scraper.run`) | `{kind, kind_label, item: ItemRef or None, item_id, monster: MonsterRef or None, npc: NpcRef or None, detail, source_url}`: `kind` = `name_mismatch` / `unknown_item_ref` / `npc_shop_rejected` / `shop_correction`; `kind_label` = "Name differs" / "Unknown item ID" / "Shop page skipped" / "Shop data corrected" (a hand fix we applied; on live data all current findings are this kind); `item` is None when the ID isn't in our items (show `item_id` as text); `detail` is a ready-to-show sentence; `source_url` = the MapleStory Quest page (link only) |
+| `player-confirmed` | `player_confirmed(db, limit=None)` | `estimated` drops that players have reported seeing (`drops_seen > 0`), worked out at query time | DropRow |
+| `rate-mismatch` | `rate_mismatches(db, limit=None)` | drops with a known rate, at least 100 reported kills, and an observed rate more than 3x higher or lower than ours | DropRow + `ratio`, `direction`; `ratio` = observed / listed (float, 0.0 when none seen), `direction` = `"higher"` or `"lower"` |
+| `reported-not-listed` | `reported_not_listed(db, limit=None)` | drop reports for a (monster, item) pair that has no Drop row | `{monster: MonsterRef, item: ItemRef, observed: Observed}` |
+
+`DropRow` = the same keys as an item-page drop: `{monster: MonsterRef, item: ItemRef, rate_percent, rate_label, rate_source, confidence, observed: Observed, player_confirmed}`. So `m.rate_pill(row)` and `m.observed_pill(row.observed)` work on it directly. Item icons use `item.id` (`m.sprite("items", row.item.id, row.item.name)`).
+
+Also:
+- `CHECKS`: list of `{slug, label, description}` in display order (the table above).
+- `summary(db)` -> `{slug: count}` for all 7 checks.
+- `run_check(db, slug, limit=None)` -> `(rows, count)` for one slug (raises `KeyError` for an unknown slug).
+
+Notes:
+- **Rate mismatch with zero drops seen:** seeing none of a rare drop is normal, so a "lower" mismatch with `drops_seen == 0` is only flagged when we would have expected at least 3 drops (kills x listed rate >= 3).
+- **Reported-not-listed is empty for now:** `save_drop_report` only accepts items that are already a known drop of that monster. It can still fill up after a data refresh removes a Drop row that players had reported on (reports survive refreshes).
+
+For `scraper/audit.py` (data-engineer, CLI report): call `summary(db)` for the counts, and `run_check(db, slug, limit=10)` for the top issues of each check (loop over `CHECKS`).
+
+### GET `/audit?check=<slug>` -> `audit.html`
+Public, read only. `check` is optional; a blank or unknown value shows the overview.
+| var | type |
+|---|---|
+| `page_title` | `"Data quality"` |
+| `active` | str: the selected slug, or `""` for the overview |
+| `checks` | `[{slug, label, description, count, url, active}]`, one per check in `CHECKS` order (the summary cards / filter tabs); `url` is `/audit?check=<slug>`, `active` is bool |
+| `all_url` | `"/audit"` (the "All checks" tab) |
+| `last_run` | str `"YYYY-MM-DD"`: when the data was last refreshed (latest `sources.last_scraped`), or None |
+| `sections` | `[{slug, label, description, count, rows, shown, more_url}]`. Overview: all 7 checks, max 10 rows each. With `?check=`: just that one, max 500 rows. `shown` = len(rows); `more_url` = `/audit?check=<slug>` when `count > shown` on the overview, else None |
+
+Use `section.slug` to choose which columns to draw (the row shapes are in the table above). Link items to `/items/{id}`, monsters to `/monsters/{id}` and NPCs to `/npcs/{id}`.
+
+### Item and monster pages: `player_confirmed`
+Each entry in `drops` (and `how_to_get.drops`) on `/items/{id}` and `/monsters/{id}` now has **`player_confirmed`** (bool): True when `confidence == "estimated"` and players reported seeing it (`observed.drops_seen > 0`). Show a "Player-confirmed" pill.
+
+## v2.6: World map + location pings (backend-dev, Phase 5, 2026-10-12)
+
+Data comes from data-engineer's new tables `maps`, `monster_maps`, `npc_maps` (see docs/data-contract.md).
+World pictures and spots come from the v83 game files via maplestory.io (credit in the footer).
+Service: `app/services/worldmap.py`.
+
+**Coordinates:** `x`, `y` are **pixels from the top-left corner** of the world image
+(`width` x `height`). To place a ping responsively, use percentages:
+`left: x / width * 100%`, `top: y / height * 100%`.
+
+**World slugs:** `maple-island`, `victoria-island` (in that order everywhere).
+
+### Shared shapes
+```
+WorldMap = {world, name, image_url, width, height, spots: [Spot]}
+           # world: slug; name: "Maple Island" / "Victoria Island"
+           # image_url: "/static/img/worldmap/{world}.png"; width/height: ints (image size in px)
+Spot     = {x, y, label, is_town, exact,
+            maps:     [{id, name, exact}],          # A-Z
+            monsters: [{id, name, level}],          # visible monsters only, by level then name
+            npcs:     [{id, name, has_shop}]}       # A-Z
+           # One Spot per (x, y): maps that share a spot are grouped.
+           # label: the town's name if a town map is at the spot, else the most common
+           #        street name among its maps, else the first map name.
+           # is_town: bool. exact: True if at least one map really sits here (False = every map
+           #        here is a fallback to its town's spot).
+           # map.exact False = this map has no spot of its own: it is shown at the nearest map you can
+           #        walk to on the same island, or else at its return town (approximate).
+Ping     = {world, x, y, map_id, map_name, map_names, exact}
+           # One ping per spot (maps at the same spot are merged): map_id/map_name = the first one,
+           # map_names = every map name at that spot. exact as above.
+```
+
+### GET `/api/world/{world}` -> JSON `WorldMap`
+404 for an unknown world slug.
+
+### GET `/api/locate?monster=ID` | `?npc=ID` | `?map=ID` -> JSON
+```
+{kind, id, name, worlds: [slug], pings: [Ping], unplaced: [map name]}
+```
+- `kind`: `"monster"` / `"npc"` / `"map"`. `worlds`: the worlds that have pings, in standard order
+  (a monster can be on both islands -> open the first, offer a tab for the other).
+- `unplaced`: maps it's on that have no world/spot (event maps etc.) -> show as text, or ignore.
+- 400 if none (or more than one) of monster/npc/map is given, or the id isn't a number.
+- 404 if the id doesn't exist. A real id with no known maps returns `pings: []`, `worlds: []`
+  (hide the "Show on map" button: see `found_in` / `map_id` below).
+
+### Page data added
+| page | var | shape |
+|---|---|---|
+| `/` home.html | `world_maps` | `[WorldMap]` (both worlds, Maple Island first), server-rendered so no fetch is needed. Suggested: `<script type="application/json" id="world-data">{{ world_maps | tojson }}</script>` |
+| `/monsters/{id}` monster.html | `found_in` | `[{map_id, name, world, x, y, exact}]` A-Z. `world`/`x`/`y` are None for maps with no spot. `monster.maps` (names) is unchanged |
+| `/monsters/{id}` monster.html | `has_pings` | bool: at least one `found_in` row has a world |
+| `/items/{id}` item.html | `drops[].monster.id` | already there (MonsterRef has `id`). Also added `drops[].monster_id` (same value) and `drops[].has_pings` (bool) |
+| everywhere `NpcRef` is used | `NpcRef.map_id`, `NpcRef.world` | `map_id`: the NPC's map (first of `npc_maps`) or None. `world`: slug or None (None = no ping). Covers `/shops` cards, item "where to buy" rows, `/npcs/{id}` and search |
+
+"Show on map" buttons should call `/api/locate?monster=ID` (or `npc=ID`) when clicked.

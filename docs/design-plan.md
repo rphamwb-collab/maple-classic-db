@@ -45,6 +45,8 @@ Dark mode: Maple World at night (Ellinia after dark).
 
 Rule: orange is only for things you can click or the current selection. Green only for "good/success". Never decorative gradients; the only gradient is the soft sky fade behind the header.
 
+Update 2026-10-12: the home class cards and the /items banner now show each class's hometown (real v83 town art from `scraper/town_backgrounds.py`) instead of the old sunburst gradient. Light soft glows/scrims on top of the town art are allowed for readability.
+
 ## Typography (Google Fonts)
 - **Fredoka** (600) for headings, tabs and buttons: round, chunky, playful, close to the game's friendly lettering without copying it.
 - **Nunito** (400/700) for body text and tables: rounded and very readable on phones.

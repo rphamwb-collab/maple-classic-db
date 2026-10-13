@@ -8,6 +8,9 @@
     classes     [{value, label, url, count, hat_id, hat, home, stat, blurb,
                   gear: [{label, url, icon_item_id}]}]   the big class cards (equips only)
     monster_field  {total, bands: [{label, url, monster: {id, name, level}}]}
+    world_maps  [WorldMap]  both islands (Maple Island first) for the World map section:
+                {world, name, image_url, width, height,
+                 spots: [{x, y, label, is_town, exact, maps, monsters, npcs}]}
 #}
 {% extends "base.html" %}
 {% import "partials/macros.html" as m %}
@@ -63,6 +66,68 @@
       </li>
     {% endfor %}
   </ul>
+</section>
+{% endif %}
+
+<!-- ===== World map: like the game's own World Map window (W key) =====
+     Design: docs/design-worldmap.md. Data: world_maps (docs/api-contract.md v2.6).
+     The server draws both islands and every spot button here, so the map shows
+     even without JavaScript. static/js/worldmap.js then:
+       - turns the islands into tabs (one shows at a time)
+       - fills the panel on the right when you click a spot
+     Spot x/y are pixels on the picture; we place them in percent so they stay
+     on the right place at any screen size. -->
+{% if world_maps %}
+<section class="world-map" aria-labelledby="world-map-title">
+  <div class="showcase-head">
+    <h2 id="world-map-title" class="title-text">World map</h2>
+    <a href="/shops">See all shops by town</a>
+  </div>
+  <div class="wm-layout">
+    <div>
+      {# Island tabs: hidden until JavaScript runs (without JS, both islands are stacked). #}
+      <div class="tabs wm-tabs" role="tablist" aria-label="Islands" hidden>
+        {% for w in world_maps %}
+          <button type="button" role="tab" aria-controls="island-{{ w.world }}">{{ w.name }}</button>
+        {% endfor %}
+      </div>
+      <div class="win wm-islands">
+        <div class="win-body">
+          {% for w in world_maps %}
+            <div class="wm-island" id="island-{{ w.world }}" data-world="{{ w.world }}" role="tabpanel" aria-label="{{ w.name }}">
+              <h3 class="wm-island-name">{{ w.name }}</h3>
+              <div class="wm-canvas">
+                <img src="{{ w.image_url }}" alt="{{ w.name }} world map" width="{{ w.width }}" height="{{ w.height }}">
+                {# One button per spot, top to bottom so Tab moves through them in reading order. #}
+                {% for s in w.spots | sort(attribute="y") %}
+                  {%- set shops = s.npcs | selectattr("has_shop") | list -%}
+                  <button type="button" class="wm-spot{% if s.is_town %} is-town{% endif %}" aria-pressed="false"
+                          data-world="{{ w.world }}" data-x="{{ s.x }}" data-y="{{ s.y }}"
+                          style="left: {{ s.x / w.width * 100 }}%; top: {{ s.y / w.height * 100 }}%"
+                          title="{{ s.label }}"
+                          aria-label="{{ s.label }}: {{ s.maps | length }} map{{ '' if s.maps | length == 1 else 's' }}, {{ s.monsters | length }} monster{{ '' if s.monsters | length == 1 else 's' }}, {{ shops | length }} shop{{ '' if shops | length == 1 else 's' }}">
+                    {# Name tag: shown on hover, focus or when selected (the art already paints the town names). #}
+                    <span class="wm-label" aria-hidden="true">{{ s.label }}</span>
+                  </button>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+        <p class="win-note">Tap a spot to see its maps, monsters and shops.</p>
+      </div>
+    </div>
+
+    {# The spot panel. worldmap.js fills it; it starts as a quiet hint. #}
+    <section class="win wm-panel" aria-labelledby="wm-panel-title">
+      <h3 class="win-title" id="wm-panel-title">Pick a spot</h3>
+      <div class="win-body" aria-live="polite">
+        <p class="wm-hint">Pick a spot on the map to see what's there.</p>
+      </div>
+    </section>
+  </div>
+  {# The spot data for worldmap.js (the same world_maps, as JSON). #}
+  <script type="application/json" id="world-data">{{ world_maps | tojson }}</script>
 </section>
 {% endif %}
 

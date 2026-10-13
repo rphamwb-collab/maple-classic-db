@@ -29,9 +29,18 @@ class BlockedByRobots(Exception):
     """Raised when robots.txt says we are not allowed to fetch a URL."""
 
 
+class NotCached(Exception):
+    """Raised in cache-only mode (the DEFAULT) when a page isn't in data/cache/."""
+
+
 class PoliteFetcher:
-    def __init__(self, user_agent: str = USER_AGENT, delay: float = MIN_SECONDS_BETWEEN_REQUESTS):
+    def __init__(self, user_agent: str = USER_AGENT, delay: float = MIN_SECONDS_BETWEEN_REQUESTS,
+                 cache_only: bool = True):
         self.user_agent = user_agent
+        # SAFETY GUARD: by default (cache_only=True) we only read data/cache/ and never
+        # make a network request. Going online needs an explicit cache_only=False
+        # (only `python -m scraper.run --online` does that).
+        self.cache_only = cache_only
         self.delay = delay
         self._last_request_time = 0.0
         self._robots: dict[str, RobotFileParser] = {}  # one parser per site
@@ -73,6 +82,8 @@ class PoliteFetcher:
         cache_file = self._cache_path(url)
         if use_cache and cache_file.exists():
             return cache_file.read_text(encoding="utf-8")
+        if self.cache_only:
+            raise NotCached(url)  # checked BEFORE robots.txt, so no request at all
 
         if not self.allowed(url):
             raise BlockedByRobots(url)

@@ -16,7 +16,7 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 
-from scraper.base import BlockedByRobots, PoliteFetcher
+from scraper.base import BlockedByRobots, NotCached, PoliteFetcher
 
 BASE_URL = "https://maplestory.quest"
 SOURCE_NAME = "MapleStory Quest"
@@ -44,10 +44,19 @@ def _sections(html: str):
         yield heading, int(match.group(1)), text
 
 
+def _row_name(text: str) -> str:
+    """Item name = the first part of a row's text, e.g. "Snail Shell | 1 | 20%" -> "Snail Shell"."""
+    return text.split(" | ")[0].strip()
+
+
 def parse_monster_page(html: str) -> list[dict]:
-    """Return drops: [{item_id, drop_rate (0..1 or None), confidence}]."""
+    """Return drops: [{item_id, item_name, drop_rate (0..1 or None), confidence}].
+    item_name is MSQ's name for the item (used by the OSMS-vs-MSQ audit)."""
     drops: dict[int, dict] = {}
     for heading, item_id, text in _sections(html):
+        if heading.startswith(("Drop table", "Confirmed drops")) and item_id not in drops:
+            drops[item_id] = {"item_id": item_id, "item_name": _row_name(text),
+                              "drop_rate": None, "confidence": "estimated"}
         if heading.startswith("Drop table"):
             pct = re.search(r"([\d.]+)\s*%", text)
             rate = round(float(pct.group(1)) / 100, 6) if pct else None
@@ -73,7 +82,7 @@ def _row_item_id(row) -> int | None:
 
 
 def parse_npc_page(html: str) -> list[dict]:
-    """Return shop stock: [{item_id, buy_price}] from the "What <NPC> sells" panel."""
+    """Return shop stock: [{item_id, item_name, buy_price}] from the "What <NPC> sells" panel."""
     soup = BeautifulSoup(html, "html.parser")
     stock: dict[int, dict] = {}
     for h2 in soup.find_all("h2"):
@@ -85,7 +94,9 @@ def parse_npc_page(html: str) -> list[dict]:
             numbers = re.findall(r"\d[\d,]*", row.get_text(" | ", strip=True))
             if item_id and numbers:
                 # the price is the last number in the row
-                stock.setdefault(item_id, {"item_id": item_id, "buy_price": int(numbers[-1].replace(",", ""))})
+                text = row.get_text(" | ", strip=True)
+                stock.setdefault(item_id, {"item_id": item_id, "item_name": _row_name(text),
+                                           "buy_price": int(numbers[-1].replace(",", ""))})
     return list(stock.values())
 
 
@@ -99,7 +110,9 @@ def parse_npc_identity(html: str) -> tuple[str | None, str | None]:
     h1 = soup.find("h1")
     name = h1.get_text(" ", strip=True) if h1 else None
     main = soup.find("main") or soup.body
-    found = re.search(r"found in (.+?) \(", main.get_text(" ", strip=True))
+    # The map name ends at " (Region)", at " and N other maps", or at the end of the sentence.
+    # (Before 2026-10-12 only " (" was used, so pages without a region grabbed the rest of the text.)
+    found = re.search(r"found in (.+?)(?: \(| and \d+ other maps?\b|\.(?:\s|$))", main.get_text(" ", strip=True))
     return name, (found.group(1).strip() if found else None)
 
 
@@ -135,9 +148,10 @@ def parse_item_npc_price(html: str) -> int | None:
     return int(match.group(1).replace(",", "")) if match else None
 
 
-def scrape_item_prices(item_ids: list[int], log=print) -> dict[int, int | None]:
-    """Fetch /items/{id} for each ID and return {item_id: npc price or None}."""
-    fetcher = PoliteFetcher()
+def scrape_item_prices(item_ids: list[int], log=print, cache_only: bool = True) -> dict[int, int | None]:
+    """Fetch /items/{id} for each ID and return {item_id: npc price or None}.
+    cache_only=True (default): read data/cache/ only, skip pages that aren't cached."""
+    fetcher = PoliteFetcher(cache_only=cache_only)
     prices: dict[int, int | None] = {}
     try:
         for n, item_id in enumerate(item_ids, 1):
@@ -146,6 +160,8 @@ def scrape_item_prices(item_ids: list[int], log=print) -> dict[int, int | None]:
                 prices[item_id] = parse_item_npc_price(fetcher.get(url))
             except httpx.HTTPStatusError as e:
                 log(f"  [{n}/{len(item_ids)}] skip {url} ({e.response.status_code})")
+            except NotCached:
+                log(f"  [{n}/{len(item_ids)}] skip {url} (not cached)")
             except BlockedByRobots:
                 log(f"  robots.txt blocks {url}, stopping")
                 break
@@ -157,13 +173,19 @@ def scrape_item_prices(item_ids: list[int], log=print) -> dict[int, int | None]:
 
 
 def scrape(monster_ids: list[int], npc_ids: list[int], log=print,
-           npc_info: dict[int, tuple[str, str | None]] | None = None) -> tuple[dict, dict]:
-    """Fetch every monster and NPC page. Returns ({monster_id: drops}, {npc_id: stock}).
+           npc_info: dict[int, tuple[str, str | None]] | None = None,
+           cache_only: bool = True) -> tuple[dict, dict, list[dict]]:
+    """Fetch every monster and NPC page.
+    Returns ({monster_id: drops}, {npc_id: stock}, rejected) where
+    rejected = [{"npc_id", "reason"}] for NPC shops we ignored (page was a different NPC).
 
     npc_info = {npc_id: (OSMS name, OSMS map name)}. When given, an NPC page's shop
-    is only kept if the page is about that same NPC (see npc_page_matches)."""
-    fetcher = PoliteFetcher()
+    is only kept if the page is about that same NPC (see npc_page_matches).
+    cache_only=True (default): read data/cache/ only, skip pages that aren't cached.
+    Pass cache_only=False to actually go online (polite: robots.txt + 2s delay)."""
+    fetcher = PoliteFetcher(cache_only=cache_only)
     drops, shops = {}, {}
+    rejected: list[dict] = []
     npc_info = npc_info or {}
 
     def parse_npc_checked(html: str, npc_id: int) -> list[dict]:
@@ -172,6 +194,7 @@ def scrape(monster_ids: list[int], npc_ids: list[int], log=print,
             ok, reason = npc_page_matches(html, *npc_info[npc_id])
             if not ok:
                 log(f"  NPC {npc_id}: shop skipped, page is a different NPC ({reason})")
+                rejected.append({"npc_id": npc_id, "reason": reason})
                 return []
         return stock
 
@@ -190,6 +213,9 @@ def scrape(monster_ids: list[int], npc_ids: list[int], log=print,
                 except httpx.HTTPStatusError as e:
                     log(f"  [{done}/{total}] skip {url} ({e.response.status_code})")
                     continue
+                except NotCached:
+                    log(f"  [{done}/{total}] skip {url} (not cached)")
+                    continue
                 except BlockedByRobots:
                     log(f"  [{done}/{total}] robots.txt blocks {url}, skipping")
                     continue
@@ -197,4 +223,4 @@ def scrape(monster_ids: list[int], npc_ids: list[int], log=print,
                     log(f"  [{done}/{total}] fetched")
     finally:
         fetcher.close()
-    return drops, shops
+    return drops, shops, rejected

@@ -3,7 +3,8 @@
   Variables (docs/api-contract.md):
     towns        [{town, shop_count, shops: [{npc: NpcRef, item_count}]}]   towns A-Z, "Other" last
     total_shops  int
-  NpcRef = {id, name, town, map_name, location, note}   note = str or None
+  NpcRef = {id, name, town, map_name, location, note, map_id, world}   note = str or None
+           world = island slug or None (None = no "Show on map" pin)
 #}
 {% extends "base.html" %}
 {% import "partials/macros.html" as m %}
@@ -32,7 +33,9 @@
     <div class="win-body">
       <ul class="card-grid">
         {% for s in t.shops %}
-          <li>
+          {# The pin button sits in the card's corner, outside the card's link (a button can't go inside a link). #}
+          <li{% if s.npc.world %} class="has-ping"{% endif %}>
+            {% if s.npc.world %}{{ m.ping_button("npc=" ~ s.npc.id, s.npc.name, text="") }}{% endif %}
             <a class="card" href="/npcs/{{ s.npc.id }}">
               <span class="sprite-box">{{ m.art("npcs", s.npc.id, s.npc.name) }}</span>
               <span class="name">{{ s.npc.name }}</span>

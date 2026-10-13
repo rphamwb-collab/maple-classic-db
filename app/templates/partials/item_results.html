@@ -40,6 +40,24 @@
     </ul>
   </nav>
 
+  {#
+    Hometown banner for the selected class tab. Pictures: static/img/towns/{class}.webp
+    (made by scraper/town_backgrounds.py). The picture itself comes from CSS (--town).
+  #}
+  {% set towns = {
+    "all": ("Lith Harbor", "Victoria Island"),
+    "beginner": ("Amherst", "Beginner hometown"),
+    "warrior": ("Perion", "Warrior hometown"),
+    "magician": ("Ellinia", "Magician hometown"),
+    "bowman": ("Henesys", "Bowman hometown"),
+    "thief": ("Kerning City", "Thief hometown"),
+  } %}
+  {% set cls = filters["class"] if filters["class"] in towns else "all" %}
+  <div class="town-banner" data-class="{{ cls }}" role="img"
+       aria-label="{{ towns[cls][0] }}, {{ towns[cls][1] }}">
+    <p><span class="town-name">{{ towns[cls][0] }}</span> · {{ towns[cls][1] }}</p>
+  </div>
+
   <div class="win">
     <div class="win-body">
 

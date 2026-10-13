@@ -241,6 +241,32 @@ def load_monsters() -> list[dict]:
     ]
 
 
+def load_monster_maps() -> list[dict]:
+    """Where each monster spawns, by Classic map ID: [{monster_id, map_id, spawn_count}].
+    (load_monsters keeps only the names; names repeat, so IDs are needed for the world map.)
+    If a monster lists the same map twice, the counts are added together."""
+    rows: dict[tuple[int, int], dict] = {}
+    for m in _load("monsters.json")["monsters"]:
+        for mp in m.get("maps") or []:
+            if mp.get("id") is None:
+                continue
+            key = (m["id"], int(mp["id"]))
+            row = rows.setdefault(key, {"monster_id": key[0], "map_id": key[1], "spawn_count": None})
+            if mp.get("count") is not None:
+                row["spawn_count"] = (row["spawn_count"] or 0) + int(mp["count"])
+    return list(rows.values())
+
+
+def load_npc_maps() -> list[dict]:
+    """Which maps each NPC stands on: [{npc_id, map_id}] (from maps.json `npcs`)."""
+    pairs = set()
+    for region in _load("maps.json")["regions"]:
+        for mp in region["maps"]:
+            for npc_id in mp.get("npcs") or []:
+                pairs.add((int(npc_id), mp["id"]))
+    return [{"npc_id": n, "map_id": m} for n, m in sorted(pairs)]
+
+
 def load_npcs() -> list[dict]:
     """NPC names come from maps.json; we also record the first map/town they stand in."""
     data = _load("maps.json")

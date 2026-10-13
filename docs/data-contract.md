@@ -1,5 +1,27 @@
-# Data Contract (v2, Phase 3)
+# Data Contract (v4, Phase 5)
 Owner: data-engineer. If a field name changes, data-engineer will message everyone first.
+
+## What changed in v4 (Phase 5: world map, summary)
+- New tables `maps` (class `Map`), `monster_maps` (class `MonsterMap`), `npc_maps` (class `NpcMap`).
+  Full field lists are under **Tables** below.
+- New import: `from app.models import Map, MonsterMap, NpcMap`.
+- New relationships: `monster.monster_maps`, `npc.npc_maps`, `map.monster_maps`, `map.npc_maps`.
+- `monsters.maps` (list of names) and `npcs.town` / `npcs.map_name` are **unchanged**, so nothing that
+  uses them breaks. Use the new tables for map IDs and spots.
+- New files: the world map pictures plus `worlds.json` (see "World map images" below).
+- `python -m scraper.world_map` downloads and caches the maplestory.io files once (in
+  `data/raw/worldmap/`). `scraper.run` then loads the map tables offline from that cache.
+
+## What changed in v3 (Phase 4, summary)
+- **Rebuild rule:** `python -m scraper.run` drops and re-creates every table EXCEPT
+  `price_reports` and `drop_reports`. Player reports now survive a data refresh.
+  (`scraper.seed_sample` still wipes everything, because it is fake data.)
+- New table `audit_findings` (class `AuditFinding`): OSMS vs MapleStory Quest disagreements,
+  collected during `scraper.run`. It IS rebuilt (emptied and refilled) on every run.
+- **Offline by default:** `python -m scraper.run` (and `PoliteFetcher`) now read MapleStory
+  Quest pages from `data/cache/` only and never go online (an uncached page is skipped).
+  Downloading needs an explicit `--online` flag / `PoliteFetcher(cache_only=False)`.
+- New import: `from app.models import AuditFinding`.
 
 ## What changed in v2 (summary)
 - `items` gets 3 new columns: `equip_slot`, `weapon_type`, `jobs`. Old `job` and `sub_type` stay as-is.
@@ -12,10 +34,11 @@ Owner: data-engineer. If a field name changes, data-engineer will message everyo
 - Database: SQLite at `data/maple.db` (SQLAlchemy 2.x).
 - Import from code:
   - `from app.db import get_db, init_db, SessionLocal, engine`
-  - `from app.models import Base, Source, Item, Monster, Drop, Npc, ShopItem, PriceReport, DropReport, Recipe, RecipeIngredient, QuestReward`
+  - `from app.models import Base, Source, Item, Monster, Drop, Npc, ShopItem, PriceReport, DropReport, Recipe, RecipeIngredient, QuestReward, AuditFinding`
 - `get_db()` is a FastAPI dependency: `db: Session = Depends(get_db)`
 - `init_db()` creates any missing tables. It is safe to call on startup.
 - Fill with sample data: `.venv\Scripts\python -m scraper.seed_sample` (wipes and refills everything).
+- Load real data: `.venv\Scripts\python -m scraper.run` (offline, keeps `price_reports` + `drop_reports`, rebuilds everything else).
 - Money is whole **mesos** (int). Times are **UTC** `datetime`s without a timezone attached.
 - `drop_rate` is a **fraction from 0 to 1** (0.05 = 5%). `NULL` means the rate is unknown.
 - Every game-data row links to a `sources` row. In Phase 2 that is always the source named `"sample"`.
@@ -188,7 +211,97 @@ One row per (quest, reward item). Only item rewards (not exp/mesos).
 
 Relationships: `quest_reward.item`, `quest_reward.source`.
 
+### `audit_findings` (class `AuditFinding`) (v3)
+One row per disagreement between our two sources, found while `scraper.run` loads data.
+Emptied and refilled on every run (never edit by hand). `seed_sample` adds 4 sample rows
+(one per check) so tests and the `/audit` page have something to show.
+| field | type | notes |
+|---|---|---|
+| id | int PK | |
+| check | str(40), indexed | one of the values below |
+| item_id | int, nullable, indexed | game item ID. **Plain int, NOT a foreign key**: for `unknown_item_ref` the item is not in `items` |
+| monster_id | int, nullable, indexed | set when the finding came from a monster's drop table (FK -> monsters.id) |
+| npc_id | int, nullable, indexed | set when the finding came from an NPC shop page (FK -> npcs.id) |
+| detail | str | plain-English sentence, ready to show, e.g. `"OSMS calls it 'Red Potion', MapleStory Quest calls it 'Red Potion (Old)'"` |
+| source_a | str | always `"OSMS Data Explorer"` |
+| source_b | str | always `"MapleStory Quest"` |
+| found_at | datetime | UTC, when the run found it |
+
+`check` values:
+- `name_mismatch`: same item ID, different name (compared loosely: case and extra spaces ignored). `item_id` set; `monster_id` or `npc_id` = the first page where we saw the MSQ name. One row per item ID.
+- `unknown_item_ref`: an MSQ drop or shop row points at an item ID that OSMS doesn't have (not in items.json AND not in the client name list), so we skipped it. `item_id` + `monster_id` or `npc_id` set. One row per (page, item).
+- `npc_shop_rejected`: an MSQ NPC page has a shop, but the page is about a different NPC than OSMS (name or map differ), so we didn't use its shop. `npc_id` set, `item_id` NULL. `detail` gives the reason.
+- `shop_correction` (added 2026-10-12): a hand-checked fix from `scraper/corrections.py` was applied, i.e. MSQ's shop data was wrong for Classic. Either a shop moved to the right NPC (`npc_id` = the NPC it now belongs to, `item_id` NULL) or an item MSQ lists was removed from a shop (`npc_id` + `item_id` set; the item IS in `items`).
+
+Note: on the real data (2026-10-12) the first three checks find **0** rows; the earlier cross-check phases already fixed those cases via corrections.py. So `shop_correction` holds the real disagreements.
+
+Relationships: none (use the ids to look up items/monsters/npcs yourself; `item_id` may not exist in `items`).
+
+### `maps` (class `Map`) (v4)
+One row per Classic map in OSMS `maps.json`. Real data (2026-10-12): 305 maps, 168 exact spots, 92 fallback, 45 no spot (event/other maps); 689 monster_maps, 229 npc_maps.
+| field | type | notes |
+|---|---|---|
+| id | int PK | **Classic** map ID (e.g. 10001000 = Henesys), not auto-generated. Different from v83 IDs |
+| name | str, indexed | e.g. `Henesys` |
+| street_name | str, nullable | e.g. `Victoria Road` |
+| region | str, nullable | OSMS region: `Maple Island`, `Victoria Island`, `Event`, `Other`, `Dev` |
+| map_mark | str, nullable | OSMS town mark, e.g. `Henesys`, `KerningCity`, `Dungeon` |
+| is_town | bool, default False | |
+| return_map_id | int, nullable | Classic ID of the town you return to. **Plain int, not a foreign key** |
+| world | str, nullable, indexed | `maple-island`, `victoria-island`, or NULL (event/other maps: not on a world map picture) |
+| spot_x | int, nullable | **pixels from the LEFT edge** of that world's PNG (already converted from the game's centre-origin coordinates, so use as-is) |
+| spot_y | int, nullable | **pixels from the TOP edge** of that world's PNG |
+| spot_exact | bool, nullable | `True` = the game's world map has a spot for this exact map. `False` = no own spot; using its `return_map_id` town's spot instead. NULL when spot_x/spot_y are NULL |
+| v83_map_id | int, nullable | the matching v83 map ID (for debugging; NULL = no name match) |
+| source_id | int FK -> sources.id | |
+
+Rule: `world`, `spot_x`, `spot_y` are either ALL set or `spot_x`/`spot_y` are NULL. If `world` is NULL, so are the spot fields.
+Relationships: `map.monster_maps` (list[MonsterMap]), `map.npc_maps` (list[NpcMap]), `map.source`.
+
+### `monster_maps` (class `MonsterMap`) (v4): monster <-> map
+| field | type | notes |
+|---|---|---|
+| id | int PK | |
+| monster_id | int FK -> monsters.id, indexed | |
+| map_id | int FK -> maps.id, indexed | Classic map ID |
+| spawn_count | int, nullable | how many of this monster spawn on the map (OSMS `count`) |
+
+Unique on (monster_id, map_id). Relationships: `monster_map.monster`, `monster_map.map`.
+
+### `npc_maps` (class `NpcMap`) (v4): npc <-> map
+| field | type | notes |
+|---|---|---|
+| id | int PK | |
+| npc_id | int FK -> npcs.id, indexed | |
+| map_id | int FK -> maps.id, indexed | Classic map ID |
+
+Unique on (npc_id, map_id). An NPC can stand on several maps. Relationships: `npc_map.npc`, `npc_map.map`.
+
+### World map images (v4, files, not tables)
+Made by `python -m scraper.world_map` from the GMS v83 game files on maplestory.io (credit:
+"World map from the v83 game files via maplestory.io"; game art (c) Nexon).
+- `app/static/img/worldmap/maple-island.png`
+- `app/static/img/worldmap/victoria-island.png`
+- `app/static/img/worldmap/world.png` (the whole-world overview; no spots in our tables, optional to use)
+- `app/static/img/worldmap/worlds.json`, one entry per picture:
+  ```json
+  {
+    "victoria-island": {"title": "Victoria Island", "image": "/static/img/worldmap/victoria-island.png",
+                        "width": 640, "height": 470, "origin": {"x": 320, "y": 235}},
+    "maple-island": {...}, "world": {...}
+  }
+  ```
+  `origin` is only for reference: `maps.spot_x/spot_y` are already in top-left pixel coordinates.
+  To place a ping on a scaled picture use percentages: `left = spot_x / width * 100%`, `top = spot_y / height * 100%`.
+
 ## Sample data (what the seed creates)
 - ~30 items (equips, potions, scrolls, etc drops), ~10 monsters with drops, 5 NPC shops.
 - ~60 days of price reports for ~6 items, including a few absurd outliers (status `ok`, so backend's IQR filter must handle them) and a couple already `flagged`.
 - Some drop reports. Some drops have `drop_rate = NULL` on purpose to test the "unknown" display.
+- v4 world map sample (fake spots, tagged source "sample"):
+  - maps: 10001000 Henesys (victoria-island, exact, town), 10001100 Henesys Hunting Ground I (victoria-island, exact),
+    10001101 Pig Park (victoria-island, **spot_exact=False**, uses Henesys's spot), 40000 Snail Hunting Ground I
+    (maple-island, exact), 1000000 Amherst (maple-island, exact, town), 90000000 Sample Event Map (**world NULL**, no spot).
+  - monster_maps: Snail 100100 on 40000 + 10001100 (both islands), Blue Snail 100101 on 40000, Pig 1210100 on 10001101
+    (fallback spot), Orange Mushroom 1210102 on 90000000 (no spot).
+  - npc_maps: Pia 1011000 and Rina 1012003 on 10001000 (Henesys).

@@ -9,3 +9,6 @@ data/*.db
 data/*.db-journal
 data/cache/
 .env
+# maplestory.io download cache for the town pictures (~45 MB, 18k files).
+# Only needed to redraw them; the finished pictures are in app/static/img/towns/.
+data/raw/towns/

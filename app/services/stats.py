@@ -114,3 +114,12 @@ def format_percent(percent):
     # Trim trailing zeros: "5.00" -> "5", "0.5000" -> "0.5"
     text = text.rstrip("0").rstrip(".")
     return f"{text}%"
+
+
+def is_player_confirmed(confidence, drops_seen):
+    """True when an older-version ("estimated") drop has been seen by players.
+
+    It means a player actually saw this item drop in Classic, so the
+    "may not drop in Classic" warning is no longer a worry.
+    """
+    return confidence == "estimated" and (drops_seen or 0) > 0

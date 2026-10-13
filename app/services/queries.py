@@ -10,7 +10,9 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 
 from app.models import DropReport, Item, Monster, Npc, PriceReport
-from app.services.stats import format_percent, iqr_bounds, observed_rate, price_stats
+from app.services import worldmap
+from app.services.stats import (format_percent, iqr_bounds, is_player_confirmed, observed_rate,
+                                price_stats)
 
 HISTORY_DAYS = 30
 RECENT_REPORTS = 20
@@ -46,9 +48,22 @@ def visible_monsters(query):
     return query
 
 
+def npc_place(npc):
+    """(map_id, world) for an NPC's map, from the npc_maps table.
+    Prefers a map that has a spot on our world maps; world is None = no ping."""
+    maps = sorted((link.map for link in getattr(npc, "npc_maps", []) or []), key=lambda m: m.id)
+    if not maps:
+        return None, None
+    placed = [m for m in maps if worldmap.has_spot(m)]
+    if placed:
+        return placed[0].id, placed[0].world
+    return maps[0].id, None
+
+
 def npc_ref(npc):
     # Build a readable location like "Henesys Market, Henesys".
     parts = [p for p in (npc.map_name, npc.town) if p]
+    map_id, world = npc_place(npc)
     return {
         "id": npc.id,
         "name": npc.name,
@@ -56,6 +71,8 @@ def npc_ref(npc):
         "map_name": npc.map_name,
         "location": ", ".join(parts) or None,
         "note": getattr(npc, "note", None),  # e.g. "Not open in this release"
+        "map_id": map_id,  # for "Show on map"
+        "world": world,    # None = we can't ping this NPC
     }
 
 
@@ -86,12 +103,15 @@ def observed_for(db, monster_id, item_id):
 def drop_info(db, drop):
     """Known rate (if any) + observed rate for one Drop row."""
     rate_percent = drop.drop_rate * 100 if drop.drop_rate is not None else None
+    observed = observed_for(db, drop.monster_id, drop.item_id)
     return {
         "rate_percent": rate_percent,
         "rate_label": format_percent(rate_percent),  # "unknown" when None
         "rate_source": drop.rate_source,
         "confidence": drop.confidence,
-        "observed": observed_for(db, drop.monster_id, drop.item_id),
+        "observed": observed,
+        # True = an older-version estimate that players have now seen drop in Classic
+        "player_confirmed": is_player_confirmed(drop.confidence, observed["drops_seen"]),
     }
 
 
@@ -200,9 +220,13 @@ def item_detail(db, item_id):
         key=lambda s: s["buy_price"],
     )
     # Test/unreleased monsters are left out of "Dropped by".
+    visible_drops = [d for d in item.drops if not is_hidden(d.monster)]
+    pingable = worldmap.monsters_with_pings(db, {d.monster_id for d in visible_drops})
     drops = sorted(
-        ({"monster": monster_ref(d.monster), **drop_info(db, d)}
-         for d in item.drops if not is_hidden(d.monster)),
+        ({"monster": monster_ref(d.monster), "monster_id": d.monster_id,
+          "has_pings": d.monster_id in pingable,  # True -> show the "Show on map" button
+          **drop_info(db, d)}
+         for d in visible_drops),
         key=lambda d: (d["monster"]["level"] or 0, d["monster"]["name"]),
     )
     recent = ok_prices_since(db, item_id, utc_now() - timedelta(days=HISTORY_DAYS))[:RECENT_REPORTS]
@@ -268,7 +292,10 @@ def monster_detail(db, monster_id):
         ({"item": item_ref(d.item), **drop_info(db, d)} for d in monster.drops),
         key=lambda d: d["item"]["name"],
     )
+    found_in = worldmap.found_in(db, monster_id)  # maps with world-map spots
     return {
+        "found_in": found_in,
+        "has_pings": any(f["world"] for f in found_in),
         "monster": {
             "id": monster.id,
             "name": monster.name,

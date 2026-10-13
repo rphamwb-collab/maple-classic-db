@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db, init_db
 from app.models import Item, Monster
-from app.services import admin, browse, filters, queries
+from app.services import admin, audit, browse, filters, queries, worldmap
 from app.services.reports import WORLDS, ReportError, save_drop_report, save_price_report
 
 APP_DIR = Path(__file__).parent
@@ -55,7 +55,8 @@ def is_htmx(request):
 def home(request: Request, db: Session = Depends(get_db)):
     return render(request, "home.html", page_title="MapleStory Classic DB", q="",
                   counts=browse.home_counts(db), class_tabs=filters.home_class_tabs(db),
-                  classes=filters.home_classes(db), monster_field=browse.home_monster_field(db))
+                  classes=filters.home_classes(db), monster_field=browse.home_monster_field(db),
+                  world_maps=worldmap.all_world_maps(db))
 
 
 @app.get("/items")
@@ -127,6 +128,12 @@ def npc_page(request: Request, npc_id: int, db: Session = Depends(get_db)):
     return render(request, "npc.html", page_title=data["npc"]["name"], **data)
 
 
+@app.get("/audit")
+def audit_page(request: Request, check: str = "", db: Session = Depends(get_db)):
+    """Data quality page: gaps and disagreements in our data. ?check=<slug> shows one check."""
+    return render(request, "audit.html", page_title="Data quality", **audit.audit_page(db, check))
+
+
 # ---------- JSON for the price chart ----------
 
 @app.get("/api/items/{item_id}/price-history")
@@ -134,6 +141,35 @@ def price_history(item_id: int, db: Session = Depends(get_db)):
     if db.get(Item, item_id) is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return queries.price_history(db, item_id)
+
+
+# ---------- JSON for the world map ----------
+
+@app.get("/api/world/{world}")
+def world_api(world: str, db: Session = Depends(get_db)):
+    """One island's picture + clickable spots (maps, monsters, NPCs at each)."""
+    data = worldmap.world_map(db, world)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Unknown world")
+    return data
+
+
+@app.get("/api/locate")
+def locate_api(monster: str = "", npc: str = "", map: str = "", db: Session = Depends(get_db)):
+    """Pings for "Show on map". Give exactly one of ?monster=ID, ?npc=ID or ?map=ID."""
+    given = {kind: value for kind, value in (("monster", monster), ("npc", npc), ("map", map))
+             if value.strip()}
+    if len(given) != 1:
+        raise HTTPException(status_code=400, detail="Give exactly one of monster, npc or map.")
+    kind, value = next(iter(given.items()))
+    try:
+        thing_id = int(value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="The id must be a number.")
+    data = worldmap.locate(db, kind, thing_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"{kind.capitalize()} not found")
+    return data
 
 
 # ---------- forms (user reports) ----------

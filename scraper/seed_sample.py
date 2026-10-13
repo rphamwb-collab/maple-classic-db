@@ -13,12 +13,16 @@ from sqlalchemy import func, select
 
 from app.db import SessionLocal, engine, init_db
 from app.models import (
+    AuditFinding,
     Base,
     Drop,
     DropReport,
     Item,
+    Map,
     Monster,
+    MonsterMap,
     Npc,
+    NpcMap,
     PriceReport,
     QuestReward,
     Recipe,
@@ -173,6 +177,40 @@ NPCS = [
 ]
 
 # ---------------------------------------------------------------------------
+# v4 world map: (map_id, name, street_name, region, map_mark, is_town, return_map_id,
+#                world, spot_x, spot_y, spot_exact)
+# Spots are pixels from the top-left of app/static/img/worldmap/{world}.png. Pixel values are
+# copied from the real world map so pings land somewhere sensible; the map IDs are made up.
+# ---------------------------------------------------------------------------
+MAPS = [
+    (10001000, "Henesys", "Victoria Road", "Victoria Island", "Henesys", True, None,
+     "victoria-island", 292, 377, True),
+    (10001100, "Henesys Hunting Ground I", "Victoria Road", "Victoria Island", "Henesys", False, 10001000,
+     "victoria-island", 240, 374, True),
+    # no spot of its own: uses Henesys's spot (spot_exact False)
+    (10001101, "Pig Park", "Hidden Street", "Victoria Island", "Henesys", False, 10001000,
+     "victoria-island", 292, 377, False),
+    (40000, "Snail Hunting Ground I", "Maple Road", "Maple Island", "Amherst", False, 1000000,
+     "maple-island", 140, 146, True),
+    (1000000, "Amherst", "Rainbow Street", "Maple Island", "Amherst", True, None,
+     "maple-island", 301, 220, True),
+    # an event map: not on any world map picture (world and spot all None)
+    (90000000, "Sample Event Map", "Event", "Event", "Event", False, None, None, None, None, None),
+]
+
+# (monster_id, map_id, spawn_count)
+MONSTER_MAPS = [
+    (100100, 40000, 12),      # Snail: Maple Island ...
+    (100100, 10001100, 8),    # ... and Victoria Island
+    (100101, 40000, 6),       # Blue Snail
+    (1210100, 10001101, 10),  # Pig: on a fallback-spot map
+    (1210102, 90000000, 5),   # Orange Mushroom: on a map with no spot
+]
+
+# (npc_id, map_id)
+NPC_MAPS = [(1011000, 10001000), (1012003, 10001000)]  # Pia + Rina in Henesys
+
+# ---------------------------------------------------------------------------
 # Market price reports: item_id -> typical price (mesos per unit) and daily drift
 # ---------------------------------------------------------------------------
 MARKET_ITEMS = {
@@ -257,6 +295,23 @@ def make_drop_reports(now) -> list[DropReport]:
     return reports
 
 
+def make_audit_findings() -> list[AuditFinding]:
+    """One fake OSMS-vs-MapleStory-Quest disagreement per check, so the /audit page has rows."""
+    return [
+        AuditFinding(check="name_mismatch", item_id=2000000, monster_id=100100,
+                     detail="OSMS calls it 'Red Potion', MapleStory Quest (monster 100100) calls it 'Red Potion (sample)'"),
+        AuditFinding(check="unknown_item_ref", item_id=4999999, monster_id=100100,
+                     detail="MapleStory Quest (monster 100100) lists item 4999999 'Sample Mystery Item', "
+                            "but OSMS has no item with that ID"),
+        AuditFinding(check="npc_shop_rejected", npc_id=1011000,
+                     detail="MapleStory Quest NPC page 1011000 has a shop, but it is a different NPC: "
+                            "name differs (MSQ 'Sample' vs OSMS 'Pia'). Shop not used."),
+        AuditFinding(check="shop_correction", npc_id=1011000, item_id=2000001,
+                     detail="MapleStory Quest's shop list for NPC 1011000 includes 'Orange Potion' (older v83 list); "
+                            "the Classic shop does not sell it, so it was removed (sample row)"),
+    ]
+
+
 def seed() -> None:
     wipe_database()
     now = utc_now()
@@ -290,6 +345,16 @@ def seed() -> None:
             for item_id, price in stock:
                 db.add(ShopItem(npc_id=npc_id, item_id=item_id, buy_price=price, source_id=sample.id))
 
+        for (map_id, name, street, region, mark, town, ret, world, x, y, exact) in MAPS:
+            db.add(Map(id=map_id, name=name, street_name=street, region=region, map_mark=mark, is_town=town,
+                       return_map_id=ret, world=world, spot_x=x, spot_y=y, spot_exact=exact,
+                       v83_map_id=None, source_id=sample.id))
+        db.flush()  # maps must exist before the rows that point at them
+        for (mob_id, map_id, count) in MONSTER_MAPS:
+            db.add(MonsterMap(monster_id=mob_id, map_id=map_id, spawn_count=count))
+        for (npc_id, map_id) in NPC_MAPS:
+            db.add(NpcMap(npc_id=npc_id, map_id=map_id))
+
         for (rid, out_id, n_out, disc, disc_lvl, req_lvl, exp, cost, ings) in RECIPES:
             db.add(Recipe(id=rid, output_item_id=out_id, result_count=n_out, discipline=disc,
                           discipline_level=disc_lvl, req_level=req_lvl, craft_exp=exp, meso_cost=cost,
@@ -302,12 +367,13 @@ def seed() -> None:
 
         db.add_all(make_price_reports(now))
         db.add_all(make_drop_reports(now))
+        db.add_all(make_audit_findings())
         db.commit()
 
         # Print row counts so we can see it worked.
         print("Seeded data/maple.db with sample data:")
         for model in (Source, Item, Monster, Drop, Npc, ShopItem, PriceReport, DropReport,
-                      Recipe, RecipeIngredient, QuestReward):
+                      Recipe, RecipeIngredient, QuestReward, AuditFinding, Map, MonsterMap, NpcMap):
             count = db.scalar(select(func.count()).select_from(model))
             print(f"  {model.__tablename__:<14} {count}")
 

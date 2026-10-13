@@ -678,6 +678,15 @@ a.card:hover { border-color: var(--mw-orange); }
 [data-theme="dark"] [data-class="bowman"]   { --cls: #85D06A; --cls-sky: #1C3518; }
 [data-theme="dark"] [data-class="thief"]    { --cls: #C69AF0; --cls-sky: #2E1E42; }
 
+/* Each class's hometown, drawn from the game files by scraper/town_backgrounds.py.
+   Used behind the home class cards and as the /items banner. "all" = Lith Harbor. */
+[data-class="beginner"] { --town: url("/static/img/towns/beginner.webp"); }
+[data-class="warrior"]  { --town: url("/static/img/towns/warrior.webp"); }
+[data-class="magician"] { --town: url("/static/img/towns/magician.webp"); }
+[data-class="bowman"]   { --town: url("/static/img/towns/bowman.webp"); }
+[data-class="thief"]    { --town: url("/static/img/towns/thief.webp"); }
+[data-class="all"]      { --town: url("/static/img/towns/all.webp"); }
+
 /* --- Home: "Choose your class" showcase (the centrepiece) --- */
 .class-showcase { margin: 0.5rem 0 2rem; }
 .showcase-head {
@@ -725,21 +734,32 @@ a.card:hover { border-color: var(--mw-orange); }
 }
 .class-main:hover { color: var(--mw-ink); }
 .class-stage {
-  /* the class hat, big, on a sunburst in the class colour */
+  /* the class character standing in its hometown (--town picture) */
+  position: relative;
   display: grid;
   place-items: center;
   width: calc(100% + 1.5rem);
   height: 9.5rem;
   margin: 0 -0.75rem 0.4rem;
-  background:
-    radial-gradient(circle at 50% 50%, var(--cls-sky) 0 2.6rem, transparent 4.8rem),
-    repeating-conic-gradient(from 0deg at 50% 50%,
-      color-mix(in srgb, var(--cls) 22%, var(--cls-sky)) 0 10deg, var(--cls-sky) 10deg 20deg);
+  background: var(--town, var(--cls-sky)) center bottom / cover no-repeat;
+  image-rendering: auto;   /* painted town art: smooth scaling (pixelated made it jagged when shrunk) */
   border-bottom: 3px solid var(--cls);
 }
+.class-stage::before {
+  /* soft glow behind the character so it stands out from the busy town */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 55%, rgba(255, 255, 255, 0.55) 0 2.4rem, transparent 4.6rem);
+}
+.class-stage img { position: relative; }   /* sits above the glow */
 .class-stage img {
-  /* class character (static/img/classes/*.png), shown ~1.6x; pixelated keeps it crisp */
-  height: 8rem;
+  /* class character (static/img/classes/*.png, trimmed to the character by
+     scraper/class_images.py). Every class is drawn the same height (the Thief's
+     size), feet on the same line; pixelated keeps it crisp. */
+  align-self: end;
+  margin-bottom: 0.9rem;
+  height: 7.35rem;
   width: auto;
   max-width: 92%;
   object-fit: contain;
@@ -884,6 +904,56 @@ a.card:hover { border-color: var(--mw-orange); }
 /* /items class tabs pick up their class colour */
 .tabs [data-class] a { border-top: 3px solid var(--cls, transparent); }
 .tabs [data-class] a[aria-current="page"] { color: var(--cls, var(--mw-ink)); }
+
+/* /items hometown banner: the selected class's town above the filters */
+.town-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  height: 140px;
+  margin: 0 0 0.75rem;
+  border: 3px solid var(--cls, var(--mw-wood));
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--town) center bottom / cover no-repeat;
+  image-rendering: auto;   /* painted town art: smooth scaling */
+  box-shadow: var(--mw-shadow);
+}
+.town-banner p {
+  /* label on a dark strip at the bottom so it's readable on any town */
+  position: relative;
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 0.8rem;
+  background: linear-gradient(to top, rgba(12, 19, 38, 0.75), transparent);
+  color: #FFF8EC;
+  font-family: var(--mw-display);
+  font-weight: 600;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+.town-banner .town-name { font-size: 1.2rem; }
+@media (max-width: 576px) {
+  .town-banner { height: 96px; }
+  .town-banner .town-name { font-size: 1.05rem; }
+}
+
+/* Dark mode: towns at night (a dark wash over the picture, glow toned down) */
+@media only screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .class-stage::before,
+  :root:not([data-theme="light"]) .town-banner::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 55%, rgba(255, 240, 200, 0.25) 0 2.4rem, rgba(8, 12, 30, 0.45) 5rem);
+  }
+}
+[data-theme="dark"] .class-stage::before,
+[data-theme="dark"] .town-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 55%, rgba(255, 240, 200, 0.25) 0 2.4rem, rgba(8, 12, 30, 0.45) 5rem);
+}
 @media (prefers-reduced-motion: reduce) {
   .class-card, .class-card:hover { transition: none; transform: none; }
 }
@@ -1132,6 +1202,9 @@ a.card:hover { border-color: var(--mw-orange); }
   margin-bottom: 0.5rem;
 }
 .chart-caption { font-size: 0.85rem; color: var(--mw-muted); margin: 0 0 1rem; }
+/* Small external link under the chart (e.g. MesoWatch). Wraps nicely on phones. */
+.external-note { font-size: 0.85rem; margin: 0.5rem 0 0; display: flex; flex-wrap: wrap; gap: 0.25rem 0.6rem; }
+.external-note .muted { color: var(--mw-muted); }
 .report-form {
   margin-top: 1rem;
   padding: 1rem;
@@ -1206,3 +1279,398 @@ p.notice {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* =========================================================
+   Data quality page (/audit) - design: docs/design-audit.md
+   Checks look like entries in the in-game Quest Log.
+   ========================================================= */
+
+/* "Player-confirmed" pill: outlined green, so it differs from the filled green observed pill */
+.pill-confirmed {
+  background: var(--mw-paper);
+  color: var(--mw-green-ink);
+  border: 2px solid var(--mw-green);
+}
+.pill-confirmed::before { content: "\2713\00a0"; }   /* check mark + space */
+
+/* Summary cards: a grid of small quest entries (2 columns on phones) */
+.audit-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0 0 1.5rem;
+  padding: 0;
+}
+@media (min-width: 720px) { .audit-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.audit-cards li { list-style: none; margin: 0; }
+.audit-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 100%;
+  padding: 0.55rem 0.7rem;
+  background: var(--mw-paper);
+  border: 2px solid var(--mw-wood);
+  border-radius: 12px;
+  box-shadow: var(--mw-shadow);
+  color: var(--mw-ink);
+  text-decoration: none;
+}
+.audit-card:hover { border-color: var(--mw-orange); }
+/* The selected check gets the orange "selected" border (orange = clickable/selected only) */
+.audit-card[aria-current="page"] { border-color: var(--mw-orange); box-shadow: 0 3px 0 var(--mw-orange); }
+.audit-icon {
+  font-family: var(--mw-display);
+  font-weight: 600;
+  color: var(--mw-wood);
+}
+.audit-card.is-clear .audit-icon { color: var(--mw-green-ink); }
+.audit-card-text { display: flex; flex-direction: column; min-width: 0; }
+.audit-card-label { font-weight: 700; font-size: 0.9rem; line-height: 1.25; }
+.audit-card-count {
+  font-family: var(--mw-display);
+  font-weight: 600;
+  font-size: 1.56rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.audit-card-count.clear { font-size: 1rem; color: var(--mw-green-ink); }
+.audit-card-count.clear::before { content: "\2713\00a0"; }
+
+/* One window per check */
+.audit-desc { color: var(--mw-muted); margin: 0 0 0.75rem; max-width: 70ch; }
+.audit-thing { display: inline-flex; align-items: center; gap: 0.45rem; }
+.slot-sm { width: 32px; height: 32px; border-radius: 7px; }
+.slot-sm .icon { width: 26px; height: 26px; }
+.audit-table td { vertical-align: middle; }
+.audit-table .sub { display: block; font-size: 0.8rem; color: var(--mw-muted); margin-top: 0.15rem; }
+.audit-table .ext { display: block; font-size: 0.8rem; }
+/* Phones: hide less important columns so tables fit */
+@media (max-width: 576px) { .hide-sm { display: none; } }
+/* Phones: let pills wrap inside narrow table cells instead of being cut off */
+.audit-table .pill { white-space: normal; }
+@media (max-width: 576px) {
+  .audit-table th, .audit-table td { padding-left: 0.35rem; padding-right: 0.35rem; }
+  .audit-table .slot-sm { display: none; }   /* names alone are enough on a small screen */
+}
+
+/* =====================================================================
+   8. World map (docs/design-worldmap.md)
+   The home "World map" window, the spot panel, the "Show on map" buttons
+   and the shared ping dialog. JavaScript lives in static/js/worldmap.js.
+   ===================================================================== */
+
+/* --- Home section: map on the left (about 2/3), spot panel on the right --- */
+.world-map { margin: 0 0 2rem; }
+.wm-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.wm-layout .win { margin: 0; }
+.wm-islands .win-body { padding: 0.75rem; }
+@media (max-width: 860px) {
+  .wm-layout { grid-template-columns: minmax(0, 1fr); }   /* phone/tablet: panel goes under the map */
+}
+
+/* Island tabs are <button>s (no page load), styled like the inventory tabs. */
+.wm-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.35rem 0.85rem;
+  border: 3px solid var(--mw-wood);
+  border-radius: 12px 12px 0 0;
+  background: var(--mw-paper-2);
+  color: var(--mw-muted);
+  font-family: var(--mw-display);
+  font-weight: 500;
+  font-size: 1rem;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.wm-tabs button:hover { color: var(--mw-ink); }
+.wm-tabs button[aria-selected="true"] {
+  padding-top: 0.6rem;
+  background: var(--mw-paper);
+  border-bottom-color: var(--mw-paper);
+  color: var(--mw-ink);
+  box-shadow: inset 0 3px 0 var(--mw-orange);
+}
+.wm-tabs .count { font-family: var(--pico-font-family); font-size: 0.75rem; color: var(--mw-muted); }
+.wm-tabs[hidden] { display: none; }
+
+/* Island heading: only shown when JS is off (then both islands are stacked). */
+.wm-island + .wm-island { margin-top: 1rem; }
+.wm-island-name { margin: 0 0 0.5rem; font-size: 1.1rem; }
+.wm-js .wm-island-name { display: none; }
+.wm-js .wm-island + .wm-island { margin-top: 0; }
+
+/* --- The map picture with spots drawn on top ---
+   Spots are placed in percent (left = x / width, top = y / height), so they
+   stay on the right place however big or small the picture is drawn. */
+.wm-canvas {
+  position: relative;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--mw-navy);
+  line-height: 0;
+}
+.wm-canvas > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: auto;   /* painted map art: smooth scaling looks better than blocky pixels */
+}
+
+/* One spot = a <button>. The button is a big invisible tap area (40px);
+   the visible dot is its ::before. */
+.wm-spot {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;      /* centre the button on the spot */
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  line-height: 1;
+}
+.wm-spot:hover, .wm-spot:focus, .wm-spot:active { background: transparent; box-shadow: none; }
+.wm-spot::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--mw-paper);
+  border: 2px solid var(--mw-wood);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.wm-spot.is-town::before { width: 18px; height: 18px; }
+.wm-spot:hover::before, .wm-spot:focus-visible::before { background: var(--mw-orange); border-color: var(--mw-paper); }
+.wm-spot:focus-visible { outline-offset: -4px; }
+/* Selected spot: orange dot + a still ring (no animation on the home map). */
+.wm-spot[aria-pressed="true"]::before {
+  background: var(--mw-orange);
+  border-color: var(--mw-paper);
+  box-shadow: 0 0 0 3px var(--mw-orange);
+}
+.wm-spot[aria-pressed="true"], .wm-spot:hover, .wm-spot:focus-visible { z-index: 2; }
+/* Name tag under a dot. Hidden until the spot is hovered, focused or selected,
+   because the map art already has the town names painted on it. */
+.wm-spot .wm-label {
+  position: absolute;
+  left: 50%;
+  top: 31px;
+  transform: translateX(-50%);
+  padding: 0.05rem 0.4rem;
+  border: 2px solid var(--mw-wood);
+  border-radius: 6px;
+  background: var(--mw-paper);
+  color: var(--mw-ink);
+  font-family: var(--mw-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;          /* taps go to the dot's button */
+  display: none;
+}
+@media (max-width: 576px) {
+  .wm-spot .wm-label { font-size: 0.7rem; top: 29px; padding: 0 0.3rem; border-width: 1.5px; }
+}
+
+/* --- Spot panel --- */
+.wm-group { margin: 0 0 0.9rem; }
+.wm-group:last-child { margin-bottom: 0; }
+.wm-group h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+.wm-group .rows > li { padding: 0.3rem 0; gap: 0.6rem; }
+.wm-group .rows .slot { width: 40px; height: 40px; }
+.wm-group .rows .slot img { max-width: 34px; max-height: 34px; width: auto; height: auto; image-rendering: pixelated; }
+.wm-more {
+  margin-top: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--pico-primary);
+  font-family: var(--pico-font-family);
+  font-size: 0.9rem;
+  text-decoration: underline;
+}
+.wm-hint { margin: 0; color: var(--mw-muted); }
+
+/* Small round "x" close button in a window title strip. */
+.wm-close {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0 -0.5rem 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #FFF8EC;
+  box-shadow: none;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.wm-close:hover { background: rgba(255, 255, 255, 0.15); }
+
+/* --- "Show on map" buttons (a small outlined pill with a pin) --- */
+.ping-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  width: auto;
+  margin: 0;
+  padding: 0.1rem 0.6rem;
+  border: 2px solid var(--mw-wood-soft);
+  border-radius: 999px;
+  background: var(--mw-paper);
+  color: var(--mw-ink);
+  box-shadow: none;
+  font-family: var(--pico-font-family);
+  font-weight: 700;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ping-btn:hover, .ping-btn:focus { border-color: var(--mw-orange); background: var(--mw-paper); color: var(--mw-ink); }
+/* Pin-only version inside a "Found in" pill. */
+.map-list .pill { display: inline-flex; align-items: center; gap: 0.3rem; }
+.map-list .pill .ping-btn { padding: 0 0.3rem; border-width: 1.5px; font-size: 0.75rem; }
+.map-list-actions { margin: 0.5rem 0 0; }
+.rows .ping-btn { margin-top: 0.2rem; }
+/* /shops cards: the pin sits in the card's top-right corner (outside the card's link). */
+.card-grid > li.has-ping { position: relative; }
+.card-grid > li.has-ping > .ping-btn { position: absolute; top: 0.35rem; right: 0.35rem; padding: 0.1rem 0.4rem; }
+
+/* --- Ping dialog ---
+   Pico draws <dialog> as a full-screen overlay; our window sits in the middle. */
+.wm-dialog { --pico-modal-overlay-background-color: rgba(18, 27, 46, 0.55); }
+.wm-dialog > .win {
+  width: min(94vw, 760px);
+  max-height: 92vh;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+}
+.wm-dialog .win-body { overflow-y: auto; }
+.wm-dialog .wm-dialog-map { margin-top: 0; }
+.wm-status { margin: 0.6rem 0 0; color: var(--mw-muted); }
+.wm-status:empty { display: none; }
+.wm-ping-list { margin: 0.6rem 0 0; padding-left: 1.25rem; }
+.wm-ping-list li { margin: 0.15rem 0; }
+.wm-ping-list .approx { color: var(--mw-muted); font-size: 0.85rem; }
+.wm-unplaced { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--mw-muted); }
+
+/* --- Ping dialog: every spot on the island as a plain dot (same look as the home
+       map's dots), so the lit-up pings stand out among all the locations --- */
+.wm-bg-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--mw-paper);
+  border: 2px solid var(--mw-wood);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.wm-bg-dot.is-town { width: 15px; height: 15px; }
+@media (max-width: 576px) {
+  .wm-bg-dot { width: 8px; height: 8px; border-width: 1.5px; }
+  .wm-bg-dot.is-town { width: 10px; height: 10px; }
+}
+
+/* --- The ping: an orange dot with two rings that grow and fade ("you are here") --- */
+.wm-ping {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  line-height: 1;
+}
+.wm-ping .dot, .wm-ping .ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.wm-ping .dot {
+  width: 14px;
+  height: 14px;
+  background: var(--mw-orange);
+  border: 2px solid #FFFFFF;
+  z-index: 1;
+}
+.wm-ping .ring {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--mw-orange);
+  opacity: 0;
+  animation: wm-ping 1.6s ease-out infinite;
+}
+.wm-ping .ring + .ring { animation-delay: 0.8s; }
+@keyframes wm-ping {
+  from { transform: translate(-50%, -50%) scale(0.27); opacity: 0.7; }
+  to   { transform: translate(-50%, -50%) scale(1);    opacity: 0; }
+}
+/* Approximate spot (shown at the town): dashed ring, hollow dot. */
+.wm-ping.approx .dot { background: var(--mw-paper); border: 2px dashed var(--mw-orange); }
+.wm-ping.approx .ring { border-style: dashed; }
+/* Several maps on one spot: a small count badge. */
+.wm-ping .badge {
+  position: absolute;
+  left: 7px;
+  top: -22px;
+  z-index: 2;
+  min-width: 1.2rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: var(--mw-navy);
+  color: #FFFFFF;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2rem;
+  text-align: center;
+}
+/* Reduced motion: no moving rings, one still ring instead. */
+@media (prefers-reduced-motion: reduce) {
+  .wm-ping .ring { animation: none; opacity: 1; width: 28px; height: 28px; border-width: 2px; }
+  .wm-ping .ring + .ring { display: none; }
+}
+
+/* --- Dark mode: dim the painted map a little; ping outline becomes Night Sky --- */
+@media only screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .wm-canvas > img { filter: brightness(0.85); }
+  :root:not([data-theme="light"]) .wm-ping .dot { border-color: #121B2E; }
+  :root:not([data-theme="light"]) .wm-ping .badge { background: #3A4F80; }
+}
+[data-theme="dark"] .wm-canvas > img { filter: brightness(0.85); }
+[data-theme="dark"] .wm-ping .dot { border-color: #121B2E; }
+[data-theme="dark"] .wm-ping .badge { background: #3A4F80; }
+.wm-spot:hover .wm-label, .wm-spot:focus-visible .wm-label, .wm-spot[aria-pressed="true"] .wm-label { display: block; }
+/* Phones: the map is small, so draw smaller dots (the 40px tap area stays the same). */
+@media (max-width: 576px) {
+  .wm-spot::before { width: 9px; height: 9px; border-width: 1.5px; }
+  .wm-spot.is-town::before { width: 12px; height: 12px; }
+}
+/* The map names under the ping map: smaller, and in 2 columns when there's room. */
+.wm-ping-list { font-size: 0.9rem; line-height: 1.35; }
+@media (min-width: 577px) { .wm-ping-list { columns: 2; column-gap: 2rem; } }
+.wm-ping-list li { break-inside: avoid; }
