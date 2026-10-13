@@ -367,6 +367,6 @@
   {# Only load Chart.js when there's something to draw. #}
   {% if price_stats and price_stats.count %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-    <script src="{{ url_for('static', path='js/price-chart.js') }}"></script>
+    <script src="{{ asset('js/price-chart.js') }}"></script>
   {% endif %}
 {% endblock %}

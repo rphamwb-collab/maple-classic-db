@@ -5,6 +5,7 @@ The heavy lifting is in app/services/; this file just wires URLs to it.
 Template variables are documented in docs/api-contract.md.
 """
 
+import hashlib
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -32,6 +33,28 @@ async def lifespan(app):
 app = FastAPI(title="MapleStory Classic DB", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=APP_DIR / "static", check_dir=False), name="static")
 templates = Jinja2Templates(directory=APP_DIR / "templates")
+
+# Versioned links for our CSS/JS: asset("css/site.css") -> "/static/css/site.css?v=1a2b3c4d5e".
+# Phones keep old copies of these files for a long time. The ?v= part is a
+# fingerprint of the file's contents, so every change gets a new link and
+# browsers download the new file instead of reusing a stale one.
+_asset_versions = {}   # path -> (file modified time, fingerprint)
+
+
+def asset(path):
+    file = APP_DIR / "static" / path
+    try:
+        mtime = file.stat().st_mtime
+    except OSError:
+        return "/static/" + path   # missing file: plain link (it will 404 as before)
+    cached = _asset_versions.get(path)
+    if not cached or cached[0] != mtime:
+        cached = (mtime, hashlib.md5(file.read_bytes()).hexdigest()[:10])
+        _asset_versions[path] = cached
+    return f"/static/{path}?v={cached[1]}"
+
+
+templates.env.globals["asset"] = asset
 
 
 def render(request, template_name, **context):

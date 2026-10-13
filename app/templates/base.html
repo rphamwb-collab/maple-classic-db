@@ -29,7 +29,7 @@
   {# Pico.css: base styling for forms/buttons plus light and dark mode (follows the OS setting). #}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
   {# Our game-window look on top of Pico. #}
-  <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
+  <link rel="stylesheet" href="{{ asset('css/site.css') }}">
 
   {# HTMX powers live search, the item filters and form submits without a page reload. #}
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
@@ -117,7 +117,7 @@
   </dialog>
 
   {# World map + "Show on map" buttons (plain JS, no framework). #}
-  <script src="{{ url_for('static', path='js/worldmap.js') }}" defer></script>
+  <script src="{{ asset('js/worldmap.js') }}" defer></script>
 
   {% block scripts %}{% endblock %}
 </body>

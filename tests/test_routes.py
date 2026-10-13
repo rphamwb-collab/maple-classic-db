@@ -154,3 +154,19 @@ def test_submit_drop_rejects_bad_input(client):
         r = client.post(f"/monsters/{SNAIL}/drops", data=form, headers=HTMX)
         assert r.status_code == 200
         assert "saved" not in r.text.lower()
+
+
+# ---------- versioned CSS/JS links (so phones don't keep stale copies) ----------
+
+def test_css_link_is_versioned_by_content(client):
+    import hashlib
+    from pathlib import Path
+    css = Path(__file__).resolve().parents[1] / "app" / "static" / "css" / "site.css"
+    expected = hashlib.md5(css.read_bytes()).hexdigest()[:10]
+    r = client.get("/")
+    assert f'/static/css/site.css?v={expected}"' in r.text
+    assert "/static/js/worldmap.js?v=" in r.text
+
+
+def test_versioned_static_url_still_serves_the_file(client):
+    assert client.get("/static/css/site.css?v=anything").status_code == 200
