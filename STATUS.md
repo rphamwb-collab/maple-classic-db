@@ -2,6 +2,8 @@
 
 _Last updated: 2026-10-12. Claude updates this at the end of every phase._
 
+**Live site:** https://maple-classic-db.onrender.com (Render, free plan; it sleeps when idle, so the first visit takes ~30 s). It deploys automatically when changes are pushed to GitHub `rphamwb-collab/maple-classic-db` (`main`). Last deployed 2026-10-12 (Phases 4–5). Each deploy resets the live database to the committed copy, so player reports on the live site aren't kept yet.
+
 ## What the site does today
 - **Item lookup:** stats, NPC sell price, and how to get each item (buy, drop, craft or quest), plus what it's used in.
 - **Item browser** (`/items`): class tabs (All, Beginner, Warrior, Magician, Bowman, Thief) and picture filters (type, slot, weapon, level).
