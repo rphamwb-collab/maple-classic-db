@@ -22,8 +22,9 @@
 :root:not([data-theme="dark"]),
 [data-theme="light"] {
   /* Light mode: sky over Maple Island */
-  --mw-sky: #D7ECF8;          /* page background */
-  --mw-sky-top: #B9DDF3;      /* top of the header fade */
+  --mw-sky: #F5ECD9;          /* page background (light cream) */
+  --mw-air: #B9DDF3;          /* sky behind outdoor scenes (monster field, picture stages) */
+  --mw-sky-top: #EBDDC0;      /* top of the header fade (warm cream) */
   --mw-paper: #FFFDF6;        /* window body */
   --mw-paper-2: #F6EEDC;      /* inner rows, slots */
   --mw-wood: #8A5A2B;         /* window borders, headings */
@@ -71,6 +72,7 @@
   :root:not([data-theme="light"]) {
     --mw-sky: #121B2E;
     --mw-sky-top: #1B2947;
+    --mw-air: #1B2947;
     --mw-paper: #1C2840;
     --mw-paper-2: #24324F;
     --mw-wood: #6F86B3;
@@ -115,7 +117,7 @@
 }
 /* …or when a page forces dark with <html data-theme="dark">. Same values as above. */
 [data-theme="dark"] {
-  --mw-sky: #121B2E; --mw-sky-top: #1B2947; --mw-paper: #1C2840; --mw-paper-2: #24324F;
+  --mw-sky: #121B2E; --mw-sky-top: #1B2947; --mw-air: #1B2947; --mw-paper: #1C2840; --mw-paper-2: #24324F;
   --mw-wood: #6F86B3; --mw-title: #2C3D63; --mw-wood-soft: #33456A; --mw-orange: #FF9A3C; --mw-orange-ink: #FFAE5E;
   --mw-green: #7CC45A; --mw-green-ink: #8FD46C; --mw-navy: #0C1326; --mw-gold: #FFD34F;
   --mw-ink: #E9EEF8; --mw-muted: #9FAAC2; --mw-chart: #8FB4FF; --mw-grass: #3F7A33;
@@ -633,8 +635,90 @@ a.card:hover { border-color: var(--mw-orange); }
 
 /* --- Home --- */
 .home-hero {
+  /* desktop: search on the left, quick-jump window on the right */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(24rem, 31rem);
+  gap: 1.5rem 2rem;
+  align-items: center;
   padding: 1.5rem 0 1rem;
-  max-width: 40rem;
+}
+.quick-jump { margin: 0; }
+.quick-jump .qj-label {
+  margin: 0 0 0.35rem;
+  font-family: var(--mw-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--mw-muted);
+}
+/* The window lets the Slime poke out above it, so the title strip rounds its own corners. */
+.quick-jump { position: relative; overflow: visible; margin-top: 2.6rem; }
+.quick-jump .win-title { border-radius: 11px 11px 0 0; }
+.qj-slime {
+  /* the Slime (monsters/7.webp, animated) sitting on the window's top edge */
+  position: absolute;
+  right: 1.25rem;
+  bottom: calc(100% - 4px);
+  height: 52px;
+  width: auto;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.qj-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.4rem, 1fr));
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  list-style: none;
+}
+.qj-tiles:last-child { margin-bottom: 0; }
+@media (min-width: 861px) {
+  /* desktop: each group is one row of tiles, so the card is about as tall as the search */
+  .qj-tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.35rem; }
+  .qj-tile { padding: 0.35rem 0.15rem 0.4rem; }
+  .qj-pic { width: 2.7rem; height: 2.7rem; }
+  .qj-pic img { max-width: 2.45rem; max-height: 2.45rem; }
+  .qj-name { font-size: 0.72rem; }
+}
+.qj-tiles li { list-style: none; margin: 0; padding: 0; }
+.qj-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  height: 100%;
+  padding: 0.4rem 0.3rem 0.45rem;
+  border: 2px solid var(--mw-wood-soft);
+  border-radius: 12px;
+  background: var(--mw-paper);
+  color: var(--mw-ink);
+  text-decoration: none;
+  text-align: center;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.qj-tile:hover, .qj-tile:focus-visible { border-color: var(--mw-orange); color: var(--mw-ink); transform: translateY(-2px); }
+.qj-pic {
+  /* picture box: game sprites sit in an inventory-style slot */
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 10px;
+  background: var(--mw-paper-2);
+  overflow: hidden;
+}
+.qj-pic img { max-width: 2.9rem; max-height: 2.9rem; width: auto; height: auto; image-rendering: pixelated; }
+.qj-pic.qj-scene img {
+  /* town / world map pictures: fill the box, smooth (they're painted art) */
+  width: 100%; height: 100%; max-width: none; max-height: none;
+  object-fit: cover; image-rendering: auto;
+}
+.qj-name { font-size: 0.8rem; font-weight: 600; line-height: 1.15; }
+@media (prefers-reduced-motion: reduce) {
+  .qj-tile, .qj-tile:hover { transition: none; transform: none; }
+}
+@media (max-width: 860px) {
+  .home-hero { grid-template-columns: minmax(0, 1fr); }   /* phones/tablets: quick jump goes under the search */
 }
 .home-hero h1 { font-size: 2.44rem; margin-bottom: 0.75rem; }
 .home-hero .search-box input[type="search"] {
@@ -829,7 +913,7 @@ a.card:hover { border-color: var(--mw-orange); }
   background:
     linear-gradient(to bottom, transparent calc(100% - 3.6rem), var(--mw-grass) calc(100% - 3.6rem),
       var(--mw-grass) calc(100% - 2.9rem), #A0703F calc(100% - 2.9rem)),
-    linear-gradient(var(--mw-sky-top), var(--mw-paper-2));
+    linear-gradient(var(--mw-air), var(--mw-paper-2));
 }
 .field-row {
   display: flex;
@@ -1129,7 +1213,7 @@ a.card:hover { border-color: var(--mw-orange); }
   padding: 0 0.5rem 1.1rem;
   border: 3px solid var(--mw-wood);
   border-radius: 14px;
-  background: var(--mw-sky-top);
+  background: var(--mw-air);
   box-shadow: var(--mw-shadow);
   overflow: hidden;
 }
@@ -1366,12 +1450,18 @@ p.notice {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr);
   gap: 1rem;
-  align-items: start;
+  align-items: stretch;
 }
 .wm-layout .win { margin: 0; }
 .wm-islands .win-body { padding: 0.75rem; }
+/* Desktop: the panel is exactly as tall as the map (no empty space beside it).
+   contain: size stops a long list from making the row taller; the list scrolls instead. */
+.wm-panel { display: flex; flex-direction: column; contain: size; }
+.wm-panel .win-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 @media (max-width: 860px) {
   .wm-layout { grid-template-columns: minmax(0, 1fr); }   /* phone/tablet: panel goes under the map */
+  .wm-panel { contain: none; }
+  .wm-panel .win-body { overflow-y: visible; }
 }
 
 /* Island tabs are <button>s (no page load), styled like the inventory tabs. */

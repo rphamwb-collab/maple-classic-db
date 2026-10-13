@@ -100,7 +100,8 @@
     var start = Math.max(0, islands.findIndex(function (isl) { return isl.dataset.world === "victoria-island"; }));
     wireTabs(tablist, showIsland)(start, false);
 
-    // Clicking a spot fills the panel.
+    // Clicking a spot fills the panel. (`e.isTrusted` is false for the
+    // automatic Henesys selection below, so that one never scrolls the page.)
     section.addEventListener("click", function (e) {
       var btn = e.target.closest(".wm-spot");
       if (!btn) return;
@@ -111,8 +112,8 @@
       section.querySelectorAll('.wm-spot[aria-pressed="true"]').forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
       btn.setAttribute("aria-pressed", "true");
       fillPanel(spot);
-      // Phones: the panel is under the map, so bring it into view.
-      if (window.matchMedia("(max-width: 860px)").matches) {
+      // Phones: the panel is under the map, so bring it into view (real taps only).
+      if (e.isTrusted && window.matchMedia("(max-width: 860px)").matches) {
         var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         section.querySelector(".wm-panel").scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
       }
@@ -172,6 +173,10 @@
         panelBody.appendChild(el("p", { class: "wm-hint" }, "We don't have monsters or shops listed for this spot yet."));
       }
     }
+
+    // Start with Henesys selected, so the panel beside the map is never empty.
+    var startSpot = section.querySelector('.wm-island[data-world="victoria-island"] .wm-spot[title="Henesys"]');
+    if (startSpot) startSpot.click();
   }
 
   // =================================================================

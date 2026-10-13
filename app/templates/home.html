@@ -23,17 +23,64 @@
 
 <!-- ===== Big search ===== -->
 <section class="home-hero">
-  <h1>Find any item, monster or shop in Maple World</h1>
-  {% with box_id="home-suggestions", placeholder="Try Red Potion, Snail, or Henesys" %}
-    {% include "partials/search_box.html" %}
-  {% endwith %}
-  {% if counts %}
-    <p class="counts">
-      <strong>{{ m.num(counts["items"]) }}</strong> items,
-      <strong>{{ m.num(counts.monsters) }}</strong> monsters and
-      <strong>{{ m.num(counts.shops) }}</strong> NPC shops so far.
-    </p>
-  {% endif %}
+  <div class="hero-search">
+    <h1>Find any item, monster or shop in Maple World</h1>
+    {% with box_id="home-suggestions", placeholder="Try Red Potion, Snail, or Henesys" %}
+      {% include "partials/search_box.html" %}
+    {% endwith %}
+    {% if counts %}
+      <p class="counts">
+        <strong>{{ m.num(counts["items"]) }}</strong> items,
+        <strong>{{ m.num(counts.monsters) }}</strong> monsters and
+        <strong>{{ m.num(counts.shops) }}</strong> NPC shops so far.
+      </p>
+    {% endif %}
+  </div>
+
+  {# Quick jump: the things players look up most, as picture tiles (beside the
+     search on desktop, under it on phones). A Slime sits on top of the window.
+     Each tile: (label, link, picture URL). Pictures are the game art already in static/. #}
+  {% set popular = [
+    ("Red Potion", "/items/2000000", "/static/img/items/2000000.png"),
+    ("Work Gloves", "/items/1082000", "/static/img/items/1082000.png"),
+    ("Snail", "/monsters/2", "/static/img/monsters/2.webp"),
+    ("Pig", "/monsters/8", "/static/img/monsters/8.webp"),
+    ("Orange Mushroom", "/monsters/9", "/static/img/monsters/9.webp"),
+    ("Henesys", "/search?q=Henesys", "/static/img/towns/bowman.webp"),
+  ] %}
+  {% set goto = [
+    ("Items", "/items", "/static/img/items/2000003.png"),
+    ("Monsters", "/monsters", "/static/img/monsters/13.webp"),
+    ("Shops", "/shops", "/static/img/npcs/21.png"),
+    ("World map", "#world-map-title", "/static/img/worldmap/victoria-island.png"),
+    ("Data quality", "/audit", "/static/img/items/2030004.png"),
+  ] %}
+  <aside class="win quick-jump" aria-labelledby="quick-jump-title">
+    <img class="qj-slime" src="/static/img/monsters/7.webp" alt="" aria-hidden="true">
+    <h2 class="win-title" id="quick-jump-title">Quick jump</h2>
+    <div class="win-body">
+      <p class="qj-label">Popular</p>
+      <ul class="qj-tiles">
+        {% for label, url, pic in popular %}
+          <li><a class="qj-tile" href="{{ url }}">
+            <span class="qj-pic{% if 'towns' in pic %} qj-scene{% endif %}"><img src="{{ pic }}" alt="" loading="lazy"
+              onerror="this.onerror=null;this.src='/static/img/placeholder.svg'"></span>
+            <span class="qj-name">{{ label }}</span>
+          </a></li>
+        {% endfor %}
+      </ul>
+      <p class="qj-label">Go to</p>
+      <ul class="qj-tiles">
+        {% for label, url, pic in goto %}
+          <li><a class="qj-tile" href="{{ url }}">
+            <span class="qj-pic{% if 'worldmap' in pic %} qj-scene{% endif %}"><img src="{{ pic }}" alt="" loading="lazy"
+              onerror="this.onerror=null;this.src='/static/img/placeholder.svg'"></span>
+            <span class="qj-name">{{ label }}</span>
+          </a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </aside>
 </section>
 
 <!-- ===== Choose your class: the main way into the site =====
