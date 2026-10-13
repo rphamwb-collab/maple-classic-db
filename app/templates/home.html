@@ -20,6 +20,9 @@
 {% block header_search %}{% endblock %}
 
 {% block content %}
+{# .home-page wraps every section so phones can reorder them in CSS
+   (on phones "Hunt monsters" moves up under the search; see site.css). #}
+<div class="home-page">
 
 <!-- ===== Big search ===== -->
 <section class="home-hero">
@@ -186,6 +189,9 @@
     <h2 id="hunt" class="title-text">Hunt monsters</h2>
     <a href="/monsters">See all {{ monster_field.total }} monsters and their drops</a>
   </div>
+  <div class="field-wrap">
+  {# Phones only: the Slime sits on top of the field (it replaces the Quick jump there). #}
+  <img class="field-slime" src="/static/img/monsters/7.webp" alt="" aria-hidden="true">
   <div class="field">
     <ul class="field-row">
       {% for b in monster_field.bands %}
@@ -198,6 +204,7 @@
         </li>
       {% endfor %}
     </ul>
+  </div>
   </div>
 </section>
 {% endif %}
@@ -221,4 +228,6 @@
   <p class="win-note">Most drop rates aren't in the game files, so many show as "Unknown rate".
     Reporting your kills on a monster's page helps fill them in.</p>
 </section>
+
+</div>{# /.home-page #}
 {% endblock %}

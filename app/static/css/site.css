@@ -1783,3 +1783,26 @@ p.notice {
   .qj-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .qj-slime { height: 44px; }
 }
+
+/* --- Home on phones: "Hunt monsters" replaces the Quick jump under the search,
+       with the Slime sitting on top of the field. Desktop is unchanged. --- */
+.field-wrap { position: relative; }
+.field-slime { display: none; }
+@media (max-width: 576px) {
+  .home-page { display: flex; flex-direction: column; }
+  .home-page > * { order: 2; }
+  .home-page > .home-hero { order: 0; }
+  .home-page > .monster-field { order: 1; }
+  .quick-jump { display: none; }
+  .field-slime {
+    display: block;
+    position: absolute;
+    right: 1.25rem;
+    bottom: calc(100% - 4px);   /* sits on the field's top edge */
+    height: 44px;
+    width: auto;
+    image-rendering: pixelated;
+    pointer-events: none;
+    z-index: 1;
+  }
+}
