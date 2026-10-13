@@ -12,13 +12,14 @@
 {# Which top-nav link is the current section? Used for aria-current below. #}
 {%- set path = request.url.path if request else "/" -%}
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">{# Always the cream light look (the owner prefers it over the night theme, even when a phone is in dark mode). #}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}MapleStory Classic DB{% endblock %} | Maple Classic DB</title>
   <meta name="description" content="MapleStory Classic item lookup, monster drops, NPC shops and a player-reported market price tracker.">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F5ECD9">
 
   {# Fonts: Fredoka (headings), Nunito (body), DotGothic16 (pixel font, only in the item tooltip and prices). #}
   <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -1757,10 +1757,29 @@ p.notice {
 .wm-spot:hover .wm-label, .wm-spot:focus-visible .wm-label, .wm-spot[aria-pressed="true"] .wm-label { display: block; }
 /* Phones: the map is small, so draw smaller dots (the 40px tap area stays the same). */
 @media (max-width: 576px) {
-  .wm-spot::before { width: 9px; height: 9px; border-width: 1.5px; }
-  .wm-spot.is-town::before { width: 12px; height: 12px; }
+  .wm-spot::before { width: 6px; height: 6px; border-width: 1px; box-shadow: none; }
+  .wm-spot.is-town::before { width: 9px; height: 9px; border-width: 1.5px; }
 }
 /* The map names under the ping map: smaller, and in 2 columns when there's room. */
 .wm-ping-list { font-size: 0.9rem; line-height: 1.35; }
 @media (min-width: 577px) { .wm-ping-list { columns: 2; column-gap: 2rem; } }
 .wm-ping-list li { break-inside: avoid; }
+
+/* =====================================================================
+   Phones (real phone width, ~360-430px): keep the home page compact
+   ===================================================================== */
+@media (max-width: 576px) {
+  /* class cards two per row instead of one huge card per row */
+  .class-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .class-stage { height: 7rem; }
+  .class-stage img { height: 5.4rem; margin-bottom: 0.6rem; }
+  .class-name { font-size: 1.45rem; }
+  .class-facts { font-size: 0.8rem; }
+  .class-blurb { font-size: 0.75rem; }
+  .class-gear { gap: 0.2rem; padding: 0.45rem 0.3rem 0.55rem; }
+  .class-gear .slot { width: 2rem; height: 2rem; }
+  /* quick jump: a little tighter */
+  .quick-jump { margin-top: 2.2rem; }
+  .qj-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .qj-slime { height: 44px; }
+}

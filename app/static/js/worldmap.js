@@ -174,9 +174,13 @@
       }
     }
 
-    // Start with Henesys selected, so the panel beside the map is never empty.
-    var startSpot = section.querySelector('.wm-island[data-world="victoria-island"] .wm-spot[title="Henesys"]');
-    if (startSpot) startSpot.click();
+    // Desktop: start with Henesys selected, so the panel beside the map is never
+    // empty. Phones skip this (the panel sits under the map and would make the
+    // page very long before anyone has tapped anything).
+    if (!window.matchMedia("(max-width: 860px)").matches) {
+      var startSpot = section.querySelector('.wm-island[data-world="victoria-island"] .wm-spot[title="Henesys"]');
+      if (startSpot) startSpot.click();
+    }
   }
 
   // =================================================================
